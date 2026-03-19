@@ -7,17 +7,23 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/SC-Bridge/sc-companion/internal/config"
 	"github.com/SC-Bridge/sc-companion/internal/events"
 	"github.com/SC-Bridge/sc-companion/internal/logtailer"
+	"github.com/SC-Bridge/sc-companion/internal/store"
+	"github.com/SC-Bridge/sc-companion/internal/sync"
+	"github.com/SC-Bridge/sc-companion/internal/tray"
 )
 
 func main() {
 	logPath := flag.String("log", "", "path to Game.log (auto-detected if empty)")
 	configPath := flag.String("config", "config.yaml", "path to config file")
 	replay := flag.Bool("replay", false, "process entire log file from start instead of tailing")
+	dbPath := flag.String("db", "", "path to SQLite database (default: ~/.scbridge/companion.db)")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -43,6 +49,15 @@ func main() {
 		slog.Info("auto-detected Game.log", "path", cfg.LogPath)
 	}
 
+	// Resolve database path
+	resolvedDBPath := *dbPath
+	if resolvedDBPath == "" {
+		home, _ := os.UserHomeDir()
+		dir := filepath.Join(home, ".scbridge")
+		os.MkdirAll(dir, 0700)
+		resolvedDBPath = filepath.Join(dir, "companion.db")
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -55,8 +70,66 @@ func main() {
 		cancel()
 	}()
 
+	// Open local database
+	db, err := store.New(resolvedDBPath)
+	if err != nil {
+		slog.Error("failed to open database", "path", resolvedDBPath, "error", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+	slog.Info("database opened", "path", resolvedDBPath)
+
 	// Event bus — all parsed events flow through here
 	bus := events.NewBus()
+
+	// Deduplication + multi-line coalescing
+	dedup := events.NewDeduplicator(10 * time.Second)
+	coalesce := events.NewCoalesceMultiLine()
+
+	// Tray controller for status tracking
+	trayCtrl := tray.NewController(bus, db, cancel)
+
+	// Store subscriber — persist deduplicated events to SQLite
+	bus.Subscribe(func(evt events.Event) {
+		// Run through coalescer first (handles multi-line money transfers)
+		merged, emit := coalesce.Process(evt)
+		if !emit {
+			return
+		}
+
+		// Skip internal/pending events
+		if merged.Type == "money_amount" {
+			return
+		}
+
+		// Deduplicate
+		if dedup.IsDuplicate(merged) {
+			return
+		}
+
+		// Persist + log
+		if _, err := db.InsertEvent(merged); err != nil {
+			slog.Error("failed to store event", "type", merged.Type, "error", err)
+			return
+		}
+		slog.Info("event",
+			"type", merged.Type,
+			"data", fmt.Sprintf("%v", merged.Data),
+		)
+	})
+
+	// Start API sync client (runs in background goroutine)
+	if cfg.APIToken != "" {
+		syncClient := sync.NewClient(cfg.APIEndpoint, cfg.APIToken, db)
+		go func() {
+			if err := syncClient.Run(ctx); err != nil {
+				slog.Error("sync client stopped", "error", err)
+			}
+		}()
+		slog.Info("API sync enabled", "endpoint", cfg.APIEndpoint)
+	} else {
+		slog.Info("API sync disabled — set api_token in config to enable")
+	}
 
 	// Start log tailer
 	tailer, err := logtailer.New(cfg.LogPath, bus)
@@ -65,16 +138,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Log subscriber for debugging
-	bus.Subscribe(func(evt events.Event) {
-		slog.Info("event",
-			"type", evt.Type,
-			"source", evt.Source,
-			"data", fmt.Sprintf("%v", evt.Data),
-		)
-	})
-
-	slog.Info("SC Bridge Companion starting", "log", cfg.LogPath, "replay", *replay)
+	slog.Info("SC Bridge Companion starting",
+		"log", cfg.LogPath,
+		"replay", *replay,
+		"db", resolvedDBPath,
+	)
 
 	var runErr error
 	if *replay {
@@ -82,6 +150,18 @@ func main() {
 	} else {
 		runErr = tailer.Run(ctx)
 	}
+
+	// Print final status
+	status := trayCtrl.StatusLine()
+	slog.Info("final status", "status", status)
+
+	total, _ := db.TotalEvents()
+	counts, _ := db.EventCounts()
+	slog.Info("event summary", "total", total)
+	for t, c := range counts {
+		slog.Info("  event type", "type", t, "count", c)
+	}
+
 	if err := runErr; err != nil && ctx.Err() == nil {
 		slog.Error("tailer stopped with error", "error", err)
 		os.Exit(1)
