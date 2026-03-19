@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SC Bridge Companion</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0a0e17;
+      color: #e2e8f0;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 12px;
+      gap: 12px;
+    }
+
+    /* Title bar */
+    .titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: linear-gradient(135deg, #1a1f2e, #151a28);
+      border-radius: 8px;
+      border: 1px solid #2a3040;
+      --wails-draggable: drag;
+    }
+
+    .titlebar h1 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #60a5fa;
+      letter-spacing: 0.5px;
+    }
+
+    .titlebar .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 6px #22c55e;
+    }
+
+    .titlebar .status-dot.offline { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+    .titlebar .status-dot.waiting { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+
+    /* Player info */
+    .player-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: linear-gradient(135deg, #1e293b, #1a2235);
+      border-radius: 8px;
+      border: 1px solid #334155;
+    }
+
+    .player-info .handle {
+      font-size: 16px;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    .player-info .details {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .player-info .ship {
+      color: #60a5fa;
+      font-weight: 500;
+    }
+
+    .player-info .location {
+      color: #a78bfa;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .stat-card {
+      padding: 10px;
+      background: linear-gradient(135deg, #1e293b, #1a2235);
+      border-radius: 8px;
+      border: 1px solid #334155;
+      text-align: center;
+    }
+
+    .stat-card .value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    .stat-card .label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .stat-card.ships .value { color: #60a5fa; }
+    .stat-card.missions .value { color: #34d399; }
+    .stat-card.travel .value { color: #a78bfa; }
+    .stat-card.events .value { color: #f59e0b; }
+
+    /* Event log */
+    .event-log {
+      flex: 1;
+      overflow-y: auto;
+      background: #0f1420;
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+      padding: 8px;
+    }
+
+    .event-log h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #475569;
+      padding: 4px 8px;
+      position: sticky;
+      top: 0;
+      background: #0f1420;
+    }
+
+    .event-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      transition: background 0.15s;
+    }
+
+    .event-item:hover { background: #1e293b; }
+
+    .event-item .time {
+      color: #475569;
+      font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+      font-size: 10px;
+      min-width: 55px;
+    }
+
+    .event-item .badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .badge.ship_boarded { background: #1e3a5f; color: #60a5fa; }
+    .badge.ship_exited { background: #1e3a5f; color: #60a5fa; }
+    .badge.contract_accepted { background: #064e3b; color: #34d399; }
+    .badge.contract_completed { background: #064e3b; color: #6ee7b7; }
+    .badge.contract_failed { background: #7f1d1d; color: #fca5a5; }
+    .badge.qt_target_selected { background: #2e1065; color: #a78bfa; }
+    .badge.qt_arrived { background: #2e1065; color: #c4b5fd; }
+    .badge.location_change { background: #1e293b; color: #94a3b8; }
+    .badge.money_sent { background: #713f12; color: #fbbf24; }
+    .badge.fined { background: #7f1d1d; color: #f87171; }
+    .badge.crimestat_increased { background: #7f1d1d; color: #f87171; }
+    .badge.insurance_claim { background: #1e293b; color: #f59e0b; }
+    .badge.blueprint_received { background: #064e3b; color: #5eead4; }
+    .badge.rewards_earned { background: #713f12; color: #fde047; }
+    .badge.player_login { background: #1e293b; color: #e2e8f0; }
+
+    .event-item .detail {
+      color: #94a3b8;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Scrollbar */
+    .event-log::-webkit-scrollbar { width: 6px; }
+    .event-log::-webkit-scrollbar-track { background: transparent; }
+    .event-log::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+    /* Footer */
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 8px;
+      font-size: 10px;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <!-- Title bar -->
+    <div class="titlebar">
+      <h1>SC BRIDGE COMPANION</h1>
+      <div class="status-dot waiting" id="status-dot" title="Waiting for game"></div>
+    </div>
+
+    <!-- Player info -->
+    <div class="player-info" id="player-section">
+      <div>
+        <div class="handle" id="player-handle">Waiting for Game.log...</div>
+        <div class="details">
+          <span class="ship" id="player-ship"></span>
+          <span class="location" id="player-location"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card ships">
+        <div class="value" id="stat-ships">0</div>
+        <div class="label">Ships</div>
+      </div>
+      <div class="stat-card missions">
+        <div class="value" id="stat-missions">0</div>
+        <div class="label">Missions</div>
+      </div>
+      <div class="stat-card travel">
+        <div class="value" id="stat-travel">0</div>
+        <div class="label">QT Jumps</div>
+      </div>
+      <div class="stat-card events">
+        <div class="value" id="stat-events">0</div>
+        <div class="label">Events</div>
+      </div>
+    </div>
+
+    <!-- Event log -->
+    <div class="event-log" id="event-log">
+      <h3>Live Event Feed</h3>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>SC Bridge Companion v0.1.0</span>
+      <span id="sync-status">Sync: offline</span>
+    </div>
+  </div>
+
+  <script>
+    // Event feed — populated by Wails Go backend via runtime.EventsOn
+    // For standalone testing, uses mock data
+
+    const eventLog = document.getElementById('event-log');
+    const stats = { ships: 0, missions: 0, travel: 0, events: 0 };
+
+    function addEvent(evt) {
+      stats.events++;
+      document.getElementById('stat-events').textContent = stats.events;
+
+      // Update stats
+      if (evt.type.startsWith('ship_')) stats.ships++;
+      if (evt.type.startsWith('contract_')) stats.missions++;
+      if (evt.type.startsWith('qt_')) stats.travel++;
+      document.getElementById('stat-ships').textContent = stats.ships;
+      document.getElementById('stat-missions').textContent = stats.missions;
+      document.getElementById('stat-travel').textContent = stats.travel;
+
+      // Update player info
+      if (evt.type === 'player_login' && evt.data?.handle) {
+        document.getElementById('player-handle').textContent = evt.data.handle;
+        document.getElementById('status-dot').className = 'status-dot';
+        document.getElementById('status-dot').title = 'Connected';
+      }
+      if (evt.type === 'ship_boarded' && evt.data?.ship) {
+        document.getElementById('player-ship').textContent = evt.data.ship;
+      }
+      if (evt.type === 'ship_exited') {
+        document.getElementById('player-ship').textContent = '';
+      }
+      if (evt.type === 'location_change' && evt.data?.location) {
+        document.getElementById('player-location').textContent = ' @ ' + evt.data.location;
+      }
+
+      // Add to event log
+      const item = document.createElement('div');
+      item.className = 'event-item';
+
+      const time = evt.timestamp ? new Date(evt.timestamp).toLocaleTimeString('en-NZ', { hour12: false }) : '--:--:--';
+      const detail = formatEventDetail(evt);
+
+      item.innerHTML = `
+        <span class="time">${time}</span>
+        <span class="badge ${evt.type}">${evt.type.replace(/_/g, ' ')}</span>
+        <span class="detail">${detail}</span>
+      `;
+
+      // Insert after the h3 header
+      const header = eventLog.querySelector('h3');
+      if (header.nextSibling) {
+        eventLog.insertBefore(item, header.nextSibling);
+      } else {
+        eventLog.appendChild(item);
+      }
+
+      // Keep max 200 items
+      const items = eventLog.querySelectorAll('.event-item');
+      if (items.length > 200) {
+        items[items.length - 1].remove();
+      }
+    }
+
+    function formatEventDetail(evt) {
+      const d = evt.data || {};
+      switch (evt.type) {
+        case 'player_login': return d.handle || '';
+        case 'ship_boarded': return `${d.ship || ''} (${d.owner || ''})`;
+        case 'ship_exited': return d.ship || '';
+        case 'contract_accepted': return d.name || '';
+        case 'contract_completed': return d.name || '';
+        case 'contract_failed': return d.name || '';
+        case 'qt_target_selected': return d.destination || '';
+        case 'qt_arrived': return 'Arrived at destination';
+        case 'location_change': return d.location || '';
+        case 'jurisdiction_entered': return d.jurisdiction || '';
+        case 'money_sent': return `${d.amount || '?'} aUEC to ${d.recipient || '?'}`;
+        case 'fined': return `${d.amount || '?'} UEC`;
+        case 'insurance_claim': return `Claim ${d.request_id || ''}`;
+        case 'blueprint_received': return d.name || '';
+        case 'rewards_earned': return `${d.count || '?'} rewards`;
+        default: return Object.values(d).join(' ');
+      }
+    }
+
+    // Wails integration — if running inside Wails, listen for events from Go backend
+    if (window.runtime) {
+      window.runtime.EventsOn('game_event', (evt) => {
+        addEvent(evt);
+      });
+      window.runtime.EventsOn('status_update', (status) => {
+        if (status.player_handle) {
+          document.getElementById('player-handle').textContent = status.player_handle;
+        }
+        if (status.current_ship) {
+          document.getElementById('player-ship').textContent = status.current_ship;
+        }
+      });
+    }
+  </script>
+</body>
+</html>
