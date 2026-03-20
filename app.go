@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -87,7 +89,9 @@ func (a *App) startup(ctx context.Context) {
 	a.cfg = cfg
 
 	// Open database
-	dbPath := fmt.Sprintf("%s/companion.db", config.DataDir())
+	dataDir := config.DataDir()
+	os.MkdirAll(dataDir, 0700)
+	dbPath := filepath.Join(dataDir, "companion.db")
 	db, err := store.New(dbPath)
 	if err != nil {
 		slog.Error("failed to open database", "error", err)

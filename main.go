@@ -38,7 +38,7 @@ func main() {
 		Bind: []interface{}{
 			app,
 		},
-		Frameless:            true,
+		Frameless:            false,
 		DisableResize:        false,
 		StartHidden:          false,
 		HideWindowOnClose:    false,
