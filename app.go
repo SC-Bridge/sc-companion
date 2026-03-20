@@ -205,26 +205,33 @@ func (a *App) startup(ctx context.Context) {
 
 	// Watch for loginData.json and connect CIG client
 	go func() {
-		loginPath, err := cigclient.FindLoginData()
-		if err != nil {
-			slog.Info("loginData.json not found yet, will watch for it")
-			// Try common base paths for the watcher
-			drives := []string{"C", "D", "E", "F"}
-			for _, d := range drives {
-				base := filepath.Join(d+`:\`, "Roberts Space Industries", "StarCitizen")
-				if _, err := os.Stat(base); err == nil {
-					loginPath = filepath.Join(base, "LIVE", "loginData.json")
-					break
+		// Build list of all possible loginData.json paths
+		var watchPaths []string
+		drives := []string{"C", "D", "E", "F"}
+		variants := []string{"LIVE", "PTU", "EPTU"}
+		baseDirs := []string{
+			"Roberts Space Industries\\StarCitizen",
+			"Program Files\\Roberts Space Industries\\StarCitizen",
+			"Games\\Roberts Space Industries\\StarCitizen",
+		}
+		for _, d := range drives {
+			for _, base := range baseDirs {
+				for _, v := range variants {
+					p := filepath.Join(d+`:\`, base, v, "loginData.json")
+					watchPaths = append(watchPaths, p)
 				}
 			}
 		}
-		if loginPath == "" {
-			slog.Warn("cannot find SC install for loginData.json watcher")
-			return
-		}
 
-		slog.Info("watching for loginData.json", "path", loginPath)
-		cigclient.WatchLoginData(loginPath, func(ld *cigclient.LoginData) {
+		slog.Info("watching for loginData.json", "paths", len(watchPaths))
+
+		// Poll all paths for loginData.json
+		cigclient.WatchLoginDataMulti(watchPaths, func(ld *cigclient.LoginData, path string) {
+			slog.Info("loginData.json detected",
+				"path", path,
+				"username", ld.Username,
+				"endpoint", ld.StarNetwork.ServicesEndpoint,
+			)
 			slog.Info("loginData.json detected",
 				"username", ld.Username,
 				"endpoint", ld.StarNetwork.ServicesEndpoint,
@@ -249,6 +256,24 @@ func (a *App) startup(ctx context.Context) {
 			a.mu.Unlock()
 
 			slog.Info("CIG client connected", "username", ld.Username)
+
+			// Auto-fetch wallet and friends on connect
+			if wallet, err := client.GetWallet(svcCtx); err != nil {
+				slog.Error("auto-fetch wallet failed", "error", err)
+			} else {
+				for _, w := range wallet {
+					slog.Info("wallet", "name", w.Name, "amount", w.Amount, "currency", w.Currency)
+				}
+			}
+
+			if friends, err := client.GetFriends(svcCtx); err != nil {
+				slog.Error("auto-fetch friends failed", "error", err)
+			} else {
+				slog.Info("friends", "count", len(friends))
+				for _, f := range friends {
+					slog.Info("friend", "nickname", f.Nickname, "displayName", f.DisplayName, "status", f.Status, "activity", f.Activity)
+				}
+			}
 		})
 	}()
 

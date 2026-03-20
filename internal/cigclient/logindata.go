@@ -67,8 +67,8 @@ func ReadLoginData(path string) (*LoginData, error) {
 	return &ld, nil
 }
 
-// WatchLoginData watches for loginData.json to appear or change.
-// Calls onChange when it's found or updated. Blocks until ctx is done.
+// WatchLoginData watches a single path for loginData.json to appear or change.
+// Calls onChange when it's found or updated. Blocks forever.
 func WatchLoginData(path string, onChange func(*LoginData)) {
 	var lastMod time.Time
 	for {
@@ -80,6 +80,31 @@ func WatchLoginData(path string, onChange func(*LoginData)) {
 				slog.Warn("failed to read loginData.json", "error", err)
 			} else {
 				onChange(ld)
+			}
+		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
+// WatchLoginDataMulti watches multiple paths for loginData.json.
+// Polls all paths every 2 seconds. Calls onChange with the login data
+// and the path that matched. Blocks forever.
+func WatchLoginDataMulti(paths []string, onChange func(*LoginData, string)) {
+	lastMods := make(map[string]time.Time)
+	for {
+		for _, p := range paths {
+			info, err := os.Stat(p)
+			if err != nil {
+				continue
+			}
+			if info.ModTime() != lastMods[p] {
+				lastMods[p] = info.ModTime()
+				ld, err := ReadLoginData(p)
+				if err != nil {
+					slog.Warn("failed to read loginData.json", "path", p, "error", err)
+					continue
+				}
+				onChange(ld, p)
 			}
 		}
 		time.Sleep(2 * time.Second)
