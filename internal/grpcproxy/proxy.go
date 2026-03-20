@@ -156,12 +156,15 @@ func (p *Proxy) handleDirect(conn net.Conn) {
 	}
 	defer tlsConn.Close()
 
-	slog.Info("direct TLS connection",
-		"sni", tlsConn.ConnectionState().ServerName,
-		"alpn", tlsConn.ConnectionState().NegotiatedProtocol,
-	)
-
+	sni := tlsConn.ConnectionState().ServerName
 	negotiatedProto := tlsConn.ConnectionState().NegotiatedProtocol
+
+	slog.Info("direct TLS connection", "sni", sni, "alpn", negotiatedProto)
+
+	// Set the SNI on the handler so backend TLS uses the right ServerName
+	if sni != "" {
+		p.handler.SNIHost = sni
+	}
 
 	if negotiatedProto == "h2" {
 		p.serveGRPC(tlsConn, p.backendAddr)

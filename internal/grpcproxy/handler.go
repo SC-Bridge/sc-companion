@@ -45,6 +45,9 @@ func (RawCodec) Name() string { return "raw" }
 type Handler struct {
 	decoder  *Decoder
 	backends sync.Map // hostname → *grpc.ClientConn
+	// SNIHost overrides the TLS ServerName when dialing backends.
+	// Used in direct mode where the addr is an IP but the cert uses a hostname.
+	SNIHost string
 }
 
 // NewHandler creates a gRPC forwarding handler.
@@ -64,7 +67,7 @@ func (h *Handler) TransparentHandler(backendAddr string) grpc.StreamHandler {
 			return fmt.Errorf("no method in stream context")
 		}
 
-		slog.Debug("forwarding gRPC call", "method", fullMethod, "backend", backendAddr)
+		slog.Info("forwarding gRPC call", "method", fullMethod, "backend", backendAddr)
 
 		// Get or create backend connection
 		cc, err := h.getBackend(backendAddr)
@@ -83,8 +86,10 @@ func (h *Handler) TransparentHandler(backendAddr string) grpc.StreamHandler {
 		}
 		clientStream, err := cc.NewStream(ctx, desc, fullMethod, grpc.ForceCodec(RawCodec{}))
 		if err != nil {
+			slog.Error("backend stream failed", "method", fullMethod, "error", err)
 			return fmt.Errorf("open backend stream: %w", err)
 		}
+		slog.Info("backend stream opened", "method", fullMethod)
 
 		// Bidirectional forwarding with two goroutines
 		var wg sync.WaitGroup
@@ -161,9 +166,14 @@ func (h *Handler) getBackend(addr string) (*grpc.ClientConn, error) {
 		return cc.(*grpc.ClientConn), nil
 	}
 
+	tlsCfg := &tls.Config{}
+	if h.SNIHost != "" {
+		tlsCfg.ServerName = h.SNIHost
+	}
+
 	cc, err := grpc.NewClient(
 		addr,
-		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})),
+		grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)),
 		grpc.WithDefaultCallOptions(grpc.ForceCodec(RawCodec{})),
 	)
 	if err != nil {
