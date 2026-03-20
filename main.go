@@ -27,6 +27,7 @@ func main() {
 		Height:    950,
 		MinWidth:  900,
 		MinHeight: 600,
+		WindowStartState: options.Maximised,
 		BackgroundColour: &options.RGBA{
 			R: 9, G: 19, B: 31, A: 255, // #09131f — sc-darker
 		},
