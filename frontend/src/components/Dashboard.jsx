@@ -1,22 +1,16 @@
 import { Radio, FileText, Database, Shield } from 'lucide-react'
 
-const StatCard = ({ icon: Icon, label, value, accent }) => (
-  <div className="relative bg-white/[0.03] backdrop-blur-md border border-white/[0.06] rounded-xl p-4 group hover:border-sc-accent/20 transition-all duration-300">
-    {/* HUD corners */}
-    <div className="absolute -top-1 -left-1 w-4 h-4 border-t border-l border-sc-accent/0 group-hover:border-sc-accent/20 transition-colors" />
-    <div className="absolute -top-1 -right-1 w-4 h-4 border-t border-r border-sc-accent/0 group-hover:border-sc-accent/20 transition-colors" />
-    <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b border-l border-sc-accent/0 group-hover:border-sc-accent/20 transition-colors" />
-    <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b border-r border-sc-accent/0 group-hover:border-sc-accent/20 transition-colors" />
-
-    <div className="flex items-center gap-3">
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${accent || 'bg-sc-accent/10'}`}>
-        <Icon size={18} className="text-sc-accent" />
+const StatCard = ({ icon: Icon, label, value }) => (
+  <div className="relative overflow-hidden bg-white/[0.03] backdrop-blur-md border border-white/[0.06] rounded-xl p-5 group hover:border-sc-accent/20 transition-all duration-300">
+    <div className="flex items-center gap-3.5">
+      <div className="w-8 h-8 rounded-lg bg-sc-accent/10 flex items-center justify-center shrink-0">
+        <Icon size={16} className="text-sc-accent" />
       </div>
-      <div>
+      <div className="min-w-0">
         <div className="text-[11px] font-[family-name:var(--font-display)] tracking-wider text-gray-500 uppercase">
           {label}
         </div>
-        <div className="text-lg font-[family-name:var(--font-mono)] text-white mt-0.5">
+        <div className="text-lg font-[family-name:var(--font-mono)] text-white mt-0.5 truncate">
           {value}
         </div>
       </div>
@@ -83,7 +77,7 @@ function Dashboard({ status }) {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           icon={Radio}
           label="gRPC Proxy"
@@ -107,11 +101,11 @@ function Dashboard({ status }) {
       </div>
 
       {/* Connection info card */}
-      <div className="bg-white/[0.03] backdrop-blur-md border border-white/[0.06] rounded-xl p-5">
-        <h3 className="font-[family-name:var(--font-display)] text-sm tracking-wider text-gray-400 uppercase mb-4">
+      <div className="bg-white/[0.03] backdrop-blur-md border border-white/[0.06] rounded-xl p-6">
+        <h3 className="font-[family-name:var(--font-display)] text-sm tracking-wider text-gray-400 uppercase mb-5">
           Data Sources
         </h3>
-        <div className="space-y-3">
+        <div className="space-y-4">
           <DataSourceRow
             label="Game.log Tailer"
             description="Parses in-game events: ship boarding, contracts, location changes, money transfers"
