@@ -71,7 +71,7 @@ function App() {
   const isDev = !wails
   if (isDev) {
     return (
-      <div className="flex flex-col h-screen">
+      <div className="flex flex-col w-full h-full overflow-hidden">
         <TitleBar isDev />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
@@ -91,7 +91,7 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col w-full h-full overflow-hidden">
       <TitleBar />
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Tab nav */}
