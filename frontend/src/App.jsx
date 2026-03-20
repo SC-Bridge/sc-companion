@@ -95,7 +95,7 @@ function App() {
       <TitleBar />
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Tab nav */}
-        <nav className="flex items-center gap-1 px-6 pt-2 border-b border-white/[0.06]">
+        <nav className="flex items-center gap-1 px-8 pt-2 border-b border-white/[0.06]">
           {[
             { id: 'dashboard', label: 'Dashboard' },
             ...(debugMode ? [{ id: 'events', label: 'Event Feed' }] : []),
@@ -104,7 +104,7 @@ function App() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative px-4 py-2.5 text-sm font-[family-name:var(--font-display)] tracking-wider uppercase transition-colors ${
+              className={`relative px-5 py-2.5 text-sm font-[family-name:var(--font-display)] tracking-wider uppercase transition-colors ${
                 activeTab === tab.id
                   ? 'text-sc-accent'
                   : 'text-gray-500 hover:text-gray-300'
@@ -119,7 +119,7 @@ function App() {
           <div className="flex-1" />
           <button
             onClick={toggleDebug}
-            className={`px-3 py-1.5 mr-1 text-xs font-[family-name:var(--font-mono)] rounded transition-colors ${
+            className={`px-3 py-1.5 mr-2 text-xs font-[family-name:var(--font-mono)] rounded transition-colors ${
               debugMode
                 ? 'bg-sc-accent/10 text-sc-accent border border-sc-accent/20'
                 : 'text-gray-600 hover:text-gray-400 border border-white/[0.06]'
@@ -130,7 +130,7 @@ function App() {
         </nav>
 
         {/* Content */}
-        <main className="flex-1 overflow-y-auto px-6 py-5">
+        <main className="flex-1 overflow-y-auto px-8 py-6">
           {activeTab === 'dashboard' && <Dashboard status={status} />}
           {activeTab === 'events' && <EventFeed events={events} />}
           {activeTab === 'settings' && <Settings config={config} />}

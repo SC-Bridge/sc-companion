@@ -7,14 +7,10 @@ function TitleBar({ isDev }) {
 
   return (
     <div className="titlebar flex items-center h-9 bg-sc-darker/80 border-b border-white/[0.04] select-none">
-      {/* Logo + title */}
-      <div className="flex items-center gap-2.5 px-3">
-        <svg viewBox="0 0 24 24" className="w-4 h-4 text-sc-accent" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="9" strokeDasharray="20 8" />
-          <line x1="3" y1="12" x2="21" y2="12" strokeWidth="2.5" />
-        </svg>
+      {/* Title only — no logo in titlebar */}
+      <div className="flex items-center px-4">
         <span className="font-[family-name:var(--font-display)] text-xs tracking-[0.2em] text-gray-400 uppercase">
-          SC Bridge
+          SC Bridge Companion
         </span>
       </div>
 
