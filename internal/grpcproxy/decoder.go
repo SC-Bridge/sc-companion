@@ -46,6 +46,11 @@ func NewDecoder(registry *Registry, bus *events.Bus) *Decoder {
 // and publishes the result as an event. Designed to be called from a goroutine
 // so it never blocks the forwarding path.
 func (d *Decoder) Decode(fullMethod string, dir Direction, payload []byte) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("decoder panic recovered", "method", fullMethod, "panic", r)
+		}
+	}()
 	info, ok := d.registry.LookupMethod(fullMethod)
 	if !ok {
 		return
@@ -96,9 +101,12 @@ func (d *Decoder) tryUnwrapPush(fullMethod, serviceName string, msg *dynamicpb.M
 		return
 	}
 
-	// Look for an Any-typed field
+	// Look for an Any-typed field (skip list/map fields)
 	msg.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 		if fd.Kind() != protoreflect.MessageKind {
+			return true
+		}
+		if fd.IsList() || fd.IsMap() {
 			return true
 		}
 		innerMsg, ok := v.Message().Interface().(*dynamicpb.Message)
