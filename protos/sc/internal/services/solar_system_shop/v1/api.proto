@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package sc.internal.services.solar_system_shop.v1;
+
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+import "sc/internal/services/solar_system_shop/v1/types.proto";
+
+service SolarSystemShopService {
+  rpc GetShopInventory ( .sc.internal.services.solar_system_shop.v1.GetShopInventoryRequest ) returns ( .sc.internal.services.solar_system_shop.v1.GetShopInventoryResponse );
+  rpc GetItemPricesFromAllShops ( .sc.internal.services.solar_system_shop.v1.GetItemPricesFromAllShopsRequest ) returns ( .sc.internal.services.solar_system_shop.v1.GetItemPricesFromAllShopsResponse );
+  rpc GetGlobalInventory ( .sc.internal.services.solar_system_shop.v1.GetGlobalInventoryRequest ) returns ( .sc.internal.services.solar_system_shop.v1.GetGlobalInventoryResponse );
+}
+
+message GetShopInventoryRequest {
+  string shop_super_guid = 1;
+}
+
+message GetShopInventoryResponse {
+  string shop_id = 1;
+  bool accepts_stolen_goods = 2;
+  repeated .sc.internal.services.solar_system_shop.v1.InventoryItem inventory_items = 3;
+}
+
+message GetItemPricesFromAllShopsRequest {
+  repeated string item_ids = 1;
+}
+
+message GetItemPricesFromAllShopsResponse {
+  map<string, .sc.internal.services.solar_system_shop.v1.ShopInventory> items = 1;
+
+}
+
+message GetGlobalInventoryRequest {}
+
+message GetGlobalInventoryResponse {
+  repeated .sc.internal.services.solar_system_shop.v1.InventoryItem inventory_items = 1;
+}
+

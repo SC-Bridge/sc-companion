@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package google.api;
+
+import "google/api/annotations.proto";
+
+message Billing {
+  repeated .google.api.Billing.BillingDestination consumer_destinations = 8;
+
+  message BillingDestination {
+    string monitored_resource = 1;
+    repeated string metrics = 2;
+  }
+}
+

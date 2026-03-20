@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package google.api;
+
+message ProjectProperties {
+  repeated .google.api.Property properties = 1;
+}
+
+message Property {
+  string name = 1;
+  .google.api.Property.PropertyType type = 2;
+  string description = 3;
+
+  enum PropertyType {
+    UNSPECIFIED = 0;
+    INT64 = 1;
+    BOOL = 2;
+    STRING = 3;
+    DOUBLE = 4;
+  }
+}
+

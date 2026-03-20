@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package sc.external.services.match.v1;
+
+message MatchSettings {
+  int32 mode = 1;
+  string map = 2;
+  int32 map_id = 3;
+  .sc.external.services.match.v1.MatchSettings.PlayersSettings players = 4;
+
+  message PlayersSettings {
+    int32 maximum = 1;
+  }
+}
+
+message Match {
+  string group_id = 1;
+  bool is_public = 2;
+  repeated string team_ids = 3;
+  .sc.external.services.match.v1.MatchSettings settings = 4;
+}
+

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package google.api;
+
+message Context {
+  repeated .google.api.ContextRule rules = 1;
+}
+
+message ContextRule {
+  string selector = 1;
+  repeated string requested = 2;
+  repeated string provided = 3;
+}
+

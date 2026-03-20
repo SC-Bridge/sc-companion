@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package google.api;
+
+message ConfigChange {
+  string element = 1;
+  string old_value = 2;
+  string new_value = 3;
+  .google.api.ChangeType change_type = 4;
+  repeated .google.api.Advice advices = 5;
+}
+
+message Advice {
+  string description = 2;
+}
+
+enum ChangeType {
+  CHANGE_TYPE_UNSPECIFIED = 0;
+  ADDED = 1;
+  REMOVED = 2;
+  MODIFIED = 3;
+}
+

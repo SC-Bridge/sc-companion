@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package sc.external.services.instance_manager.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "sc/external/common/mission/v1/contracts.proto";
+
+message InstanceHeartbeat {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+  repeated string player_geids = 3;
+  repeated .sc.external.services.instance_manager.v1.RoleSlotStats role_slot_stats = 4;
+}
+
+message InstancePrerequisites {
+  .sc.external.common.mission.v1.ContractPrerequisites contract_prerequisites = 1;
+  uint32 max_capacity = 2;
+  repeated .sc.external.services.instance_manager.v1.RoleSlot slot_rules = 3;
+}
+
+message RoleSlot {
+  string name = 1;
+  int32 max_count = 2;
+}
+
+message RoleSlotStats {
+  string name = 1;
+  int32 current_count = 2;
+}
+
+message InstanceConfig {
+  .sc.external.services.instance_manager.v1.InstanceCleanupStrategy cleanup_strategy = 1;
+  .google.protobuf.Duration creation_cooldown = 2;
+  .google.protobuf.Duration join_cooldown = 3;
+  .google.protobuf.Duration ttl = 4;
+  bool ignore_cooldowns = 5;
+}
+
+message InstanceTemplate {
+  string instance_class_guid = 1;
+  .sc.external.services.instance_manager.v1.InstanceType type = 2;
+  .sc.external.services.instance_manager.v1.InstancePrerequisites prerequisites = 3;
+  .sc.external.services.instance_manager.v1.InstanceConfig config = 4;
+}
+
+message InstanceActivityReport {
+  repeated string player_geids = 1;
+  repeated .sc.external.services.instance_manager.v1.RoleSlotStats role_slot_stats = 2;
+}
+
+message Instance {
+  uint64 instance_geid = 1;
+  string instance_identifier = 2;
+  string shard_id = 3;
+  .google.protobuf.Timestamp created_at = 4;
+  .sc.external.services.instance_manager.v1.InstanceTemplate template = 5;
+  .sc.external.services.instance_manager.v1.InstanceStatus status = 6;
+  string requester_urn = 7;
+  string assigned_to_urn = 8;
+  string stow_inventory_id = 9;
+  .google.protobuf.Timestamp last_activity_at = 10;
+  .sc.external.services.instance_manager.v1.InstanceActivityReport activity_report = 11;
+}
+
+enum InstanceCleanupStrategy {
+  INSTANCE_CLEANUP_STRATEGY_UNSPECIFIED = 0;
+  INSTANCE_CLEANUP_STRATEGY_BURY = 1;
+  INSTANCE_CLEANUP_STRATEGY_STOW = 2;
+}
+
+enum InstanceType {
+  INSTANCE_TYPE_UNSPECIFIED = 0;
+  INSTANCE_TYPE_PLAYER_HANGAR = 1;
+  INSTANCE_TYPE_STAGING_HANGAR = 2;
+  INSTANCE_TYPE_DUNGEON_OPEN = 3;
+  INSTANCE_TYPE_DUNGEON_CLOSED = 4;
+}
+
+enum InstanceStatus {
+  INSTANCE_STATUS_UNSPECIFIED = 0;
+  INSTANCE_STATUS_CREATING_UNASSIGNED = 1;
+  INSTANCE_STATUS_CREATING = 2;
+  INSTANCE_STATUS_UNASSIGNED = 3;
+  INSTANCE_STATUS_IDLE = 4;
+  INSTANCE_STATUS_ACTIVE = 5;
+  INSTANCE_STATUS_STOWING = 6;
+  INSTANCE_STATUS_STOWED = 7;
+  INSTANCE_STATUS_UNSTOWING = 8;
+  INSTANCE_STATUS_BURYING = 9;
+}
+

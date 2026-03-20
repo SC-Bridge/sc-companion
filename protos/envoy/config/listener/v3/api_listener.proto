@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package envoy.config.listener.v3;
+
+import "google/protobuf/any.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+message ApiListener {
+  .google.protobuf.Any api_listener = 1;
+}
+

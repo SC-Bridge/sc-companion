@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.config.listener.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/protocol.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message QuicProtocolOptions {
+  .envoy.config.core.v3.QuicProtocolOptions quic_protocol_options = 1;
+  .google.protobuf.Duration idle_timeout = 2;
+  .google.protobuf.Duration crypto_handshake_timeout = 3;
+  .envoy.config.core.v3.RuntimeFeatureFlag enabled = 4;
+  .google.protobuf.UInt32Value packets_to_read_to_connection_count_ratio = 5;
+  .envoy.config.core.v3.TypedExtensionConfig crypto_stream_config = 6;
+  .envoy.config.core.v3.TypedExtensionConfig proof_source_config = 7;
+}
+

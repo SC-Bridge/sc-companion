@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package envoy.type.metadata.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message MetadataKey {
+  string key = 1;
+  repeated .envoy.type.metadata.v3.MetadataKey.PathSegment path = 2;
+
+  message PathSegment {
+    oneof segment {
+      string key = 1;
+    }
+  }
+}
+
+message MetadataKind {
+  oneof kind {
+    .envoy.type.metadata.v3.MetadataKind.Request request = 1;
+    .envoy.type.metadata.v3.MetadataKind.Route route = 2;
+    .envoy.type.metadata.v3.MetadataKind.Cluster cluster = 3;
+    .envoy.type.metadata.v3.MetadataKind.Host host = 4;
+  }
+
+  message Request {
+  }
+  message Route {
+  }
+  message Cluster {
+  }
+  message Host {
+  }
+}
+

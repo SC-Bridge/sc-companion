@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package sc.internal.services.squad.v1;
+
+import "google/api/annotations.proto";
+import "sc/external/services/squad/v1/types.proto";
+import "sc/external/services/social/v1/types.proto";
+
+service SquadService {
+  rpc UpdateSettings ( .sc.internal.services.squad.v1.UpdateSettingsRequest ) returns ( .sc.internal.services.squad.v1.UpdateSettingsResponse );
+  rpc Create ( .sc.internal.services.squad.v1.CreateRequest ) returns ( .sc.internal.services.squad.v1.CreateResponse );
+  rpc Get ( .sc.internal.services.squad.v1.GetRequest ) returns ( .sc.internal.services.squad.v1.GetResponse );
+}
+
+message UpdateSettingsRequest {
+  string group_id = 1;
+  .sc.external.services.squad.v1.SquadSettings settings = 2;
+}
+
+message UpdateSettingsResponse {}
+
+message CreateRequest {
+  string group_id = 1;
+  .sc.external.services.squad.v1.SquadSettings settings = 2;
+  repeated .sc.external.services.social.v1.GroupMember members = 3;
+  string leader_urn = 4;
+}
+
+message CreateResponse {
+  .sc.external.services.squad.v1.Squad squad = 1;
+}
+
+message GetRequest {
+  string group_id = 1;
+}
+
+message GetResponse {
+  .sc.external.services.squad.v1.Squad squad = 1;
+}
+

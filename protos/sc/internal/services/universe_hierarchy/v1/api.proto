@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package sc.internal.services.universe_hierarchy.v1;
+
+import "protoc-gen-openapiv2/options/annotations.proto";
+import "google/api/annotations.proto";
+
+service UniverseHierarchyService {
+  rpc ResolveSuperGUIDs ( .sc.internal.services.universe_hierarchy.v1.ResolveSuperGUIDsRequest ) returns ( .sc.internal.services.universe_hierarchy.v1.ResolveSuperGUIDsResponse );
+  rpc ResolveEntityGEIDs ( .sc.internal.services.universe_hierarchy.v1.ResolveEntityGEIDsRequest ) returns ( .sc.internal.services.universe_hierarchy.v1.ResolveEntityGEIDsResponse );
+  rpc ResolveLocationIds ( .sc.internal.services.universe_hierarchy.v1.ResolveLocationIdsRequest ) returns ( .sc.internal.services.universe_hierarchy.v1.ResolveLocationIdsResponse );
+}
+
+message EntityMetadata {
+  string entity_name = 1;
+  uint32 entity_flags = 2;
+  uint32 entity_type = 3;
+  string oc_name = 4;
+  uint32 location_id = 5;
+  string location_name = 6;
+  int32 num_entities = 7;
+  int32 num_entities_movable = 8;
+  int32 num_entities_immovable = 9;
+}
+
+message ResolveSuperGUIDsRequest {
+  string shard_id = 1;
+  repeated .sc.internal.services.universe_hierarchy.v1.ResolveSuperGUIDsRequest.Body resolves = 2;
+  bool include_metadata = 3;
+
+  message Body {
+    uint64 relative_to_entity_id = 1;
+    repeated string guids = 2;
+  }
+}
+
+message ResolveSuperGUIDsResponse {
+  repeated .sc.internal.services.universe_hierarchy.v1.ResolveSuperGUIDsResponse.Body results = 1;
+
+  message Body {
+    uint64 entity_id = 1;
+    repeated string remaining_guids = 2;
+    .sc.internal.services.universe_hierarchy.v1.EntityMetadata entity_metadata = 3;
+  }
+}
+
+message ResolveEntityGEIDsRequest {
+  string shard_id = 1;
+  repeated .sc.internal.services.universe_hierarchy.v1.ResolveEntityGEIDsRequest.Body resolves = 2;
+  bool include_metadata = 3;
+
+  message Body {
+    uint64 relative_to_entity_id = 1;
+    uint64 entity_id = 2;
+  }
+}
+
+message ResolveEntityGEIDsResponse {
+  repeated .sc.internal.services.universe_hierarchy.v1.ResolveEntityGEIDsResponse.Body results = 1;
+
+  message Body {
+    uint64 entity_id = 1;
+    repeated string guids = 2;
+    .sc.internal.services.universe_hierarchy.v1.EntityMetadata entity_metadata = 3;
+  }
+}
+
+message ResolveLocationIdsRequest {
+  string shard_id = 1;
+  repeated uint32 location_ids = 2;
+}
+
+message ResolveLocationIdsResponse {
+  repeated uint64 entity_ids = 1;
+}
+

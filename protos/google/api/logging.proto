@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package google.api;
+
+import "google/api/annotations.proto";
+
+message Logging {
+  repeated .google.api.Logging.LoggingDestination producer_destinations = 1;
+  repeated .google.api.Logging.LoggingDestination consumer_destinations = 2;
+
+  message LoggingDestination {
+    string monitored_resource = 3;
+    repeated string logs = 1;
+  }
+}
+

@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package sc.external.services.contacts.v1;
+
+import "sc/external/services/presence/v1/types.proto";
+
+message AccountInfo {
+  string nickname = 1;
+  string display_name = 2;
+  string avatar_url = 3;
+  uint32 account_id = 4;
+  uint64 player_id = 5;
+}
+
+message FriendRequest {
+  string id = 1;
+  int64 created_at = 2;
+  uint32 friends_in_common = 3;
+  .sc.external.services.contacts.v1.AccountInfo sender = 4;
+  .sc.external.services.contacts.v1.AccountInfo receiver = 5;
+}
+
+message Note {
+  string content = 1;
+  int64 created_at = 2;
+  int64 updated_at = 3;
+}
+
+message Relationship {
+  .sc.external.services.contacts.v1.RelationshipType type = 1;
+  int64 created_at = 2;
+}
+
+message Contact {
+  .sc.external.services.contacts.v1.AccountInfo account = 1;
+  repeated .sc.external.services.contacts.v1.Relationship relationships = 2;
+  .sc.external.services.contacts.v1.Note note = 3;
+  .sc.external.services.presence.v1.Presence presence = 4;
+}
+
+enum RelationshipType {
+  RELATIONSHIP_TYPE_UNSPECIFIED = 0;
+  RELATIONSHIP_TYPE_FRIEND = 1;
+  RELATIONSHIP_TYPE_BLOCKED = 2;
+  RELATIONSHIP_TYPE_HOSTILE = 3;
+  RELATIONSHIP_TYPE_FAVORITE = 4;
+}
+

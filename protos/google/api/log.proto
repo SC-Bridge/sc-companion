@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package google.api;
+
+import "google/api/label.proto";
+
+message LogDescriptor {
+  string name = 1;
+  repeated .google.api.LabelDescriptor labels = 2;
+  string description = 3;
+  string display_name = 4;
+}
+

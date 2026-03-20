@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package envoy.service.load_stats.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/endpoint/v3/load_report.proto";
+import "google/protobuf/duration.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+service LoadReportingService {
+  rpc StreamLoadStats (stream .envoy.service.load_stats.v3.LoadStatsRequest ) returns (stream .envoy.service.load_stats.v3.LoadStatsResponse );
+}
+
+message LoadStatsRequest {
+  .envoy.config.core.v3.Node node = 1;
+  repeated .envoy.config.endpoint.v3.ClusterStats cluster_stats = 2;
+}
+
+message LoadStatsResponse {
+  repeated string clusters = 1;
+  bool send_all_clusters = 4;
+  .google.protobuf.Duration load_reporting_interval = 2;
+  bool report_endpoint_granularity = 3;
+}
+

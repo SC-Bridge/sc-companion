@@ -10,16 +10,31 @@ import (
 
 // Config holds application configuration.
 type Config struct {
-	LogPath     string `yaml:"log_path"`
-	APIEndpoint string `yaml:"api_endpoint"`
-	APIToken    string `yaml:"api_token"`
+	LogPath      string `yaml:"log_path"`
+	APIEndpoint  string `yaml:"api_endpoint"`
+	APIToken     string `yaml:"api_token"`
+	ProxyEnabled bool   `yaml:"proxy_enabled"`
+	ProxyPort    int    `yaml:"proxy_port"`
 }
 
 // Default returns a config with sensible defaults.
 func Default() *Config {
 	return &Config{
-		APIEndpoint: "https://scbridge.app/api",
+		APIEndpoint:  "https://scbridge.app/api",
+		ProxyEnabled: true,
+		ProxyPort:    8443,
 	}
+}
+
+// DataDir returns the application data directory.
+func DataDir() string {
+	if runtime.GOOS == "windows" {
+		if appData := os.Getenv("APPDATA"); appData != "" {
+			return filepath.Join(appData, "SCBridge")
+		}
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".scbridge")
 }
 
 // Load reads config from a YAML file.

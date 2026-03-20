@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package envoy.config.accesslog.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
+import "envoy/type/matcher/v3/metadata.proto";
+import "envoy/type/v3/percent.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message AccessLog {
+  string name = 1;
+  .envoy.config.accesslog.v3.AccessLogFilter filter = 2;
+  oneof config_type {
+    .google.protobuf.Any typed_config = 4;
+  }
+}
+
+message AccessLogFilter {
+  oneof filter_specifier {
+    .envoy.config.accesslog.v3.StatusCodeFilter status_code_filter = 1;
+    .envoy.config.accesslog.v3.DurationFilter duration_filter = 2;
+    .envoy.config.accesslog.v3.NotHealthCheckFilter not_health_check_filter = 3;
+    .envoy.config.accesslog.v3.TraceableFilter traceable_filter = 4;
+    .envoy.config.accesslog.v3.RuntimeFilter runtime_filter = 5;
+    .envoy.config.accesslog.v3.AndFilter and_filter = 6;
+    .envoy.config.accesslog.v3.OrFilter or_filter = 7;
+    .envoy.config.accesslog.v3.HeaderFilter header_filter = 8;
+    .envoy.config.accesslog.v3.ResponseFlagFilter response_flag_filter = 9;
+    .envoy.config.accesslog.v3.GrpcStatusFilter grpc_status_filter = 10;
+    .envoy.config.accesslog.v3.ExtensionFilter extension_filter = 11;
+    .envoy.config.accesslog.v3.MetadataFilter metadata_filter = 12;
+  }
+}
+
+message ComparisonFilter {
+  .envoy.config.accesslog.v3.ComparisonFilter.Op op = 1;
+  .envoy.config.core.v3.RuntimeUInt32 value = 2;
+
+  enum Op {
+    EQ = 0;
+    GE = 1;
+    LE = 2;
+  }
+}
+
+message StatusCodeFilter {
+  .envoy.config.accesslog.v3.ComparisonFilter comparison = 1;
+}
+
+message DurationFilter {
+  .envoy.config.accesslog.v3.ComparisonFilter comparison = 1;
+}
+
+message NotHealthCheckFilter {
+}
+
+message TraceableFilter {
+}
+
+message RuntimeFilter {
+  string runtime_key = 1;
+  .envoy.type.v3.FractionalPercent percent_sampled = 2;
+  bool use_independent_randomness = 3;
+}
+
+message AndFilter {
+  repeated .envoy.config.accesslog.v3.AccessLogFilter filters = 1;
+}
+
+message OrFilter {
+  repeated .envoy.config.accesslog.v3.AccessLogFilter filters = 2;
+}
+
+message HeaderFilter {
+  .envoy.config.route.v3.HeaderMatcher header = 1;
+}
+
+message ResponseFlagFilter {
+  repeated string flags = 1;
+}
+
+message GrpcStatusFilter {
+  repeated .envoy.config.accesslog.v3.GrpcStatusFilter.Status statuses = 1;
+  bool exclude = 2;
+
+  enum Status {
+    OK = 0;
+    CANCELED = 1;
+    UNKNOWN = 2;
+    INVALID_ARGUMENT = 3;
+    DEADLINE_EXCEEDED = 4;
+    NOT_FOUND = 5;
+    ALREADY_EXISTS = 6;
+    PERMISSION_DENIED = 7;
+    RESOURCE_EXHAUSTED = 8;
+    FAILED_PRECONDITION = 9;
+    ABORTED = 10;
+    OUT_OF_RANGE = 11;
+    UNIMPLEMENTED = 12;
+    INTERNAL = 13;
+    UNAVAILABLE = 14;
+    DATA_LOSS = 15;
+    UNAUTHENTICATED = 16;
+  }
+}
+
+message MetadataFilter {
+  .envoy.type.matcher.v3.MetadataMatcher matcher = 1;
+  .google.protobuf.BoolValue match_if_key_not_found = 2;
+}
+
+message ExtensionFilter {
+  string name = 1;
+  oneof config_type {
+    .google.protobuf.Any typed_config = 3;
+  }
+}
+

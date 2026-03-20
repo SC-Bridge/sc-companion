@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "udpa/annotations/status.proto";
+
+message ProxyProtocolConfig {
+  .envoy.config.core.v3.ProxyProtocolConfig.Version version = 1;
+
+  enum Version {
+    V1 = 0;
+    V2 = 1;
+  }
+}
+

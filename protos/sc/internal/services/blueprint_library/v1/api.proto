@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package sc.internal.services.blueprint_library.v1;
+
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+import "sc/external/services/blueprint_library/v1/types.proto";
+import "sc/external/common/api/v1/pagination.proto";
+import "sc/external/common/api/v1/query.proto";
+
+service BlueprintLibraryService {
+  rpc CreateBlueprintEntries ( .sc.internal.services.blueprint_library.v1.CreateBlueprintEntriesRequest ) returns ( .sc.internal.services.blueprint_library.v1.CreateBlueprintEntriesResponse );
+  rpc UpdateBlueprintEntries ( .sc.internal.services.blueprint_library.v1.UpdateBlueprintEntriesRequest ) returns ( .sc.internal.services.blueprint_library.v1.UpdateBlueprintEntriesResponse );
+  rpc QueryBlueprintEntries ( .sc.internal.services.blueprint_library.v1.QueryBlueprintEntriesRequest ) returns ( .sc.internal.services.blueprint_library.v1.QueryBlueprintEntriesResponse );
+  rpc DeleteBlueprintEntries ( .sc.internal.services.blueprint_library.v1.DeleteBlueprintEntriesRequest ) returns ( .sc.internal.services.blueprint_library.v1.DeleteBlueprintEntriesResponse );
+  rpc QueryBlueprintEntriesStream ( .sc.internal.services.blueprint_library.v1.QueryBlueprintEntriesStreamRequest ) returns (stream .sc.internal.services.blueprint_library.v1.QueryBlueprintEntriesStreamResponse );
+}
+
+message CreateBlueprintEntriesRequest {
+  uint64 player_id = 1;
+  repeated .sc.external.services.blueprint_library.v1.BlueprintEntry entries = 2;
+}
+
+message CreateBlueprintEntriesResponse {}
+
+message UpdateBlueprintEntriesRequest {
+  uint64 player_id = 1;
+  repeated .sc.external.services.blueprint_library.v1.BlueprintEntry entries = 2;
+}
+
+message UpdateBlueprintEntriesResponse {}
+
+message QueryBlueprintEntriesRequest {
+  uint64 player_id = 1;
+  .sc.external.common.api.v1.Query query = 2;
+}
+
+message QueryBlueprintEntriesResponse {
+  .sc.external.common.api.v1.PaginationInfo page_info = 1;
+  repeated .sc.external.services.blueprint_library.v1.BlueprintEntry results = 2;
+}
+
+message DeleteBlueprintEntriesRequest {
+  uint64 player_id = 1;
+  repeated string blueprint_ids = 2;
+}
+
+message DeleteBlueprintEntriesResponse {
+  uint32 deleted_count = 1;
+}
+
+message QueryBlueprintEntriesStreamRequest {
+  uint64 player_id = 1;
+  .sc.external.common.api.v1.Query query = 2;
+}
+
+message QueryBlueprintEntriesStreamResponse {
+  repeated .sc.external.services.blueprint_library.v1.BlueprintEntry entries = 1;
+}
+

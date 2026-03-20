@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package sc.external.services.instance_manager.v1;
+
+import "sc/external/services/instance_manager/v1/types.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+service InstanceManagerService {
+  rpc GetAvailableInstances ( .sc.external.services.instance_manager.v1.GetAvailableInstancesRequest ) returns ( .sc.external.services.instance_manager.v1.GetAvailableInstancesResponse );
+}
+
+message GetAvailableInstancesRequest {
+  repeated string instance_identifiers = 1;
+  string shard_id = 2;
+}
+
+message GetAvailableInstancesResponse {
+  repeated .sc.external.services.instance_manager.v1.Instance instances = 1;
+}
+

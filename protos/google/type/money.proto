@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package google.type;
+
+message Money {
+  string currency_code = 1;
+  int64 units = 2;
+  int32 nanos = 3;
+}
+

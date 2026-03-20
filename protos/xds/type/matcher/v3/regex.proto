@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package xds.type.matcher.v3;
+
+import "validate/validate.proto";
+
+message RegexMatcher {
+  oneof engine_type {
+    .xds.type.matcher.v3.RegexMatcher.GoogleRE2 google_re2 = 1;
+  }
+  string regex = 2;
+
+  message GoogleRE2 {}
+}
+

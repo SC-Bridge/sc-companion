@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package google.api;
+
+import "google/api/label.proto";
+import "google/protobuf/struct.proto";
+
+message MonitoredResourceDescriptor {
+  string name = 5;
+  string type = 1;
+  string display_name = 2;
+  string description = 3;
+  repeated .google.api.LabelDescriptor labels = 4;
+}
+
+message MonitoredResource {
+  string type = 1;
+  map<string, string> labels = 2;
+
+}
+
+message MonitoredResourceMetadata {
+  .google.protobuf.Struct system_labels = 1;
+  map<string, string> user_labels = 2;
+
+}
+

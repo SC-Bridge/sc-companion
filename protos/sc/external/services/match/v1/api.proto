@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package sc.external.services.match.v1;
+
+import "google/api/annotations.proto";
+import "sc/external/services/match/v1/types.proto";
+
+service MatchService {
+  rpc Get ( .sc.external.services.match.v1.GetRequest ) returns ( .sc.external.services.match.v1.GetResponse );
+}
+
+message GetRequest {
+  string group_id = 1;
+}
+
+message GetResponse {
+  .sc.external.services.match.v1.Match match = 1;
+}
+

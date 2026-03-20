@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package envoy.extensions.clusters.aggregate.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message ClusterConfig {
+  repeated string clusters = 1;
+}
+

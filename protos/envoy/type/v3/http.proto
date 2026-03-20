@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package envoy.type.v3;
+
+import "udpa/annotations/status.proto";
+
+enum CodecClientType {
+  HTTP1 = 0;
+  HTTP2 = 1;
+  HTTP3 = 2;
+}
+

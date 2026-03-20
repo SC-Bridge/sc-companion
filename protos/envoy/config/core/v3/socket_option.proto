@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message SocketOption {
+  string description = 1;
+  int64 level = 2;
+  int64 name = 3;
+  oneof value {
+    int64 int_value = 4;
+    bytes buf_value = 5;
+  }
+  .envoy.config.core.v3.SocketOption.SocketState state = 6;
+
+  enum SocketState {
+    STATE_PREBIND = 0;
+    STATE_BOUND = 1;
+    STATE_LISTENING = 2;
+  }
+}
+

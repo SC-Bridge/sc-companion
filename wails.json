@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "SC Bridge Companion",
+  "outputfilename": "SCBridgeCompanion",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "SC Bridge",
+    "email": "gavin@scbridge.app"
+  },
+  "info": {
+    "companyName": "SC Bridge",
+    "productName": "SC Bridge Companion",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright 2026 SC Bridge",
+    "comments": "Star Citizen companion app — game data interceptor and fleet manager"
+  }
+}

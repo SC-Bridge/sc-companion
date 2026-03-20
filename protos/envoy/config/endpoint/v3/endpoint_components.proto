@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package envoy.config.endpoint.v3;
+
+import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/health_check.proto";
+import "google/protobuf/wrappers.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message Endpoint {
+  .envoy.config.core.v3.Address address = 1;
+  .envoy.config.endpoint.v3.Endpoint.HealthCheckConfig health_check_config = 2;
+  string hostname = 3;
+
+  message HealthCheckConfig {
+    uint32 port_value = 1;
+    string hostname = 2;
+  }
+}
+
+message LbEndpoint {
+  oneof host_identifier {
+    .envoy.config.endpoint.v3.Endpoint endpoint = 1;
+    string endpoint_name = 5;
+  }
+  .envoy.config.core.v3.HealthStatus health_status = 2;
+  .envoy.config.core.v3.Metadata metadata = 3;
+  .google.protobuf.UInt32Value load_balancing_weight = 4;
+}
+
+message LedsClusterLocalityConfig {
+  .envoy.config.core.v3.ConfigSource leds_config = 1;
+  string leds_collection_name = 2;
+}
+
+message LocalityLbEndpoints {
+  .envoy.config.core.v3.Locality locality = 1;
+  repeated .envoy.config.endpoint.v3.LbEndpoint lb_endpoints = 2;
+  oneof lb_config {
+    .envoy.config.endpoint.v3.LocalityLbEndpoints.LbEndpointList load_balancer_endpoints = 7;
+    .envoy.config.endpoint.v3.LedsClusterLocalityConfig leds_cluster_locality_config = 8;
+  }
+  .google.protobuf.UInt32Value load_balancing_weight = 3;
+  uint32 priority = 5;
+  .google.protobuf.UInt32Value proximity = 6;
+
+  message LbEndpointList {
+    repeated .envoy.config.endpoint.v3.LbEndpoint lb_endpoints = 1;
+  }
+}
+

@@ -1,0 +1,261 @@
+syntax = "proto3";
+
+package envoy.config.cluster.v3;
+
+import "envoy/config/cluster/v3/circuit_breaker.proto";
+import "envoy/config/cluster/v3/filter.proto";
+import "envoy/config/cluster/v3/outlier_detection.proto";
+import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/health_check.proto";
+import "envoy/config/core/v3/protocol.proto";
+import "envoy/config/core/v3/resolver.proto";
+import "envoy/config/endpoint/v3/endpoint.proto";
+import "envoy/type/v3/percent.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+import "xds/core/v3/collection_entry.proto";
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/security.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message ClusterCollection {
+  .xds.core.v3.CollectionEntry entries = 1;
+}
+
+message Cluster {
+  repeated .envoy.config.cluster.v3.Cluster.TransportSocketMatch transport_socket_matches = 43;
+  string name = 1;
+  string alt_stat_name = 28;
+  oneof cluster_discovery_type {
+    .envoy.config.cluster.v3.Cluster.DiscoveryType type = 2;
+    .envoy.config.cluster.v3.Cluster.CustomClusterType cluster_type = 38;
+  }
+  .envoy.config.cluster.v3.Cluster.EdsClusterConfig eds_cluster_config = 3;
+  .google.protobuf.Duration connect_timeout = 4;
+  .google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5;
+  .envoy.config.cluster.v3.Cluster.LbPolicy lb_policy = 6;
+  .envoy.config.endpoint.v3.ClusterLoadAssignment load_assignment = 33;
+  repeated .envoy.config.core.v3.HealthCheck health_checks = 8;
+  .google.protobuf.UInt32Value max_requests_per_connection = 9 [ deprecated = true ];
+  .envoy.config.cluster.v3.CircuitBreakers circuit_breakers = 10;
+  .envoy.config.core.v3.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46 [ deprecated = true ];
+  .envoy.config.core.v3.HttpProtocolOptions common_http_protocol_options = 29 [ deprecated = true ];
+  .envoy.config.core.v3.Http1ProtocolOptions http_protocol_options = 13 [ deprecated = true ];
+  .envoy.config.core.v3.Http2ProtocolOptions http2_protocol_options = 14 [ deprecated = true ];
+  map<string, .google.protobuf.Any> typed_extension_protocol_options = 36;
+  .google.protobuf.Duration dns_refresh_rate = 16;
+  .envoy.config.cluster.v3.Cluster.RefreshRate dns_failure_refresh_rate = 44;
+  bool respect_dns_ttl = 39;
+  .envoy.config.cluster.v3.Cluster.DnsLookupFamily dns_lookup_family = 17;
+  repeated .envoy.config.core.v3.Address dns_resolvers = 18 [ deprecated = true ];
+  bool use_tcp_for_dns_lookups = 45 [ deprecated = true ];
+  .envoy.config.core.v3.DnsResolutionConfig dns_resolution_config = 53 [ deprecated = true ];
+  .envoy.config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 55;
+  .google.protobuf.BoolValue wait_for_warm_on_init = 54;
+  .envoy.config.cluster.v3.OutlierDetection outlier_detection = 19;
+  .google.protobuf.Duration cleanup_interval = 20;
+  .envoy.config.core.v3.BindConfig upstream_bind_config = 21;
+  .envoy.config.cluster.v3.Cluster.LbSubsetConfig lb_subset_config = 22;
+  oneof lb_config {
+    .envoy.config.cluster.v3.Cluster.RingHashLbConfig ring_hash_lb_config = 23;
+    .envoy.config.cluster.v3.Cluster.MaglevLbConfig maglev_lb_config = 52;
+    .envoy.config.cluster.v3.Cluster.OriginalDstLbConfig original_dst_lb_config = 34;
+    .envoy.config.cluster.v3.Cluster.LeastRequestLbConfig least_request_lb_config = 37;
+    .envoy.config.cluster.v3.Cluster.RoundRobinLbConfig round_robin_lb_config = 56;
+  }
+  .envoy.config.cluster.v3.Cluster.CommonLbConfig common_lb_config = 27;
+  .envoy.config.core.v3.TransportSocket transport_socket = 24;
+  .envoy.config.core.v3.Metadata metadata = 25;
+  .envoy.config.cluster.v3.Cluster.ClusterProtocolSelection protocol_selection = 26 [ deprecated = true ];
+  .envoy.config.cluster.v3.UpstreamConnectionOptions upstream_connection_options = 30;
+  bool close_connections_on_host_health_failure = 31;
+  bool ignore_health_on_host_removal = 32;
+  repeated .envoy.config.cluster.v3.Filter filters = 40;
+  .envoy.config.cluster.v3.LoadBalancingPolicy load_balancing_policy = 41;
+  .envoy.config.core.v3.ConfigSource lrs_server = 42;
+  bool track_timeout_budgets = 47 [ deprecated = true ];
+  .envoy.config.core.v3.TypedExtensionConfig upstream_config = 48;
+  .envoy.config.cluster.v3.TrackClusterStats track_cluster_stats = 49;
+  .envoy.config.cluster.v3.Cluster.PreconnectPolicy preconnect_policy = 50;
+  bool connection_pool_per_downstream_connection = 51;
+
+  message TransportSocketMatch {
+    string name = 1;
+    .google.protobuf.Struct match = 2;
+    .envoy.config.core.v3.TransportSocket transport_socket = 3;
+  }
+
+  message CustomClusterType {
+    string name = 1;
+    .google.protobuf.Any typed_config = 2;
+  }
+
+  message EdsClusterConfig {
+    .envoy.config.core.v3.ConfigSource eds_config = 1;
+    string service_name = 2;
+  }
+
+  message LbSubsetConfig {
+    .envoy.config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetFallbackPolicy fallback_policy = 1;
+    .google.protobuf.Struct default_subset = 2;
+    repeated .envoy.config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector subset_selectors = 3;
+    bool locality_weight_aware = 4;
+    bool scale_locality_weight = 5;
+    bool panic_mode_any = 6;
+    bool list_as_any = 7;
+
+    message LbSubsetSelector {
+      repeated string keys = 1;
+      bool single_host_per_subset = 4;
+      .envoy.config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy fallback_policy = 2;
+      repeated string fallback_keys_subset = 3;
+
+      enum LbSubsetSelectorFallbackPolicy {
+        NOT_DEFINED = 0;
+        NO_FALLBACK = 1;
+        ANY_ENDPOINT = 2;
+        DEFAULT_SUBSET = 3;
+        KEYS_SUBSET = 4;
+      }
+    }
+
+    enum LbSubsetFallbackPolicy {
+      NO_FALLBACK = 0;
+      ANY_ENDPOINT = 1;
+      DEFAULT_SUBSET = 2;
+    }
+  }
+
+  message SlowStartConfig {
+    .google.protobuf.Duration slow_start_window = 1;
+    .envoy.config.core.v3.RuntimeDouble aggression = 2;
+    .envoy.type.v3.Percent min_weight_percent = 3;
+  }
+
+  message RoundRobinLbConfig {
+    .envoy.config.cluster.v3.Cluster.SlowStartConfig slow_start_config = 1;
+  }
+
+  message LeastRequestLbConfig {
+    .google.protobuf.UInt32Value choice_count = 1;
+    .envoy.config.core.v3.RuntimeDouble active_request_bias = 2;
+    .envoy.config.cluster.v3.Cluster.SlowStartConfig slow_start_config = 3;
+  }
+
+  message RingHashLbConfig {
+    .google.protobuf.UInt64Value minimum_ring_size = 1;
+    .envoy.config.cluster.v3.Cluster.RingHashLbConfig.HashFunction hash_function = 3;
+    .google.protobuf.UInt64Value maximum_ring_size = 4;
+
+    enum HashFunction {
+      XX_HASH = 0;
+      MURMUR_HASH_2 = 1;
+    }
+  }
+
+  message MaglevLbConfig {
+    .google.protobuf.UInt64Value table_size = 1;
+  }
+
+  message OriginalDstLbConfig {
+    bool use_http_header = 1;
+    string http_header_name = 2;
+  }
+
+  message CommonLbConfig {
+    .envoy.type.v3.Percent healthy_panic_threshold = 1;
+    oneof locality_config_specifier {
+      .envoy.config.cluster.v3.Cluster.CommonLbConfig.ZoneAwareLbConfig zone_aware_lb_config = 2;
+      .envoy.config.cluster.v3.Cluster.CommonLbConfig.LocalityWeightedLbConfig locality_weighted_lb_config = 3;
+    }
+    .google.protobuf.Duration update_merge_window = 4;
+    bool ignore_new_hosts_until_first_hc = 5;
+    bool close_connections_on_host_set_change = 6;
+    .envoy.config.cluster.v3.Cluster.CommonLbConfig.ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
+    .envoy.config.core.v3.HealthStatusSet override_host_status = 8;
+
+    message ZoneAwareLbConfig {
+      .envoy.type.v3.Percent routing_enabled = 1;
+      .google.protobuf.UInt64Value min_cluster_size = 2;
+      bool fail_traffic_on_panic = 3;
+    }
+    message LocalityWeightedLbConfig {
+    }
+    message ConsistentHashingLbConfig {
+      bool use_hostname_for_hashing = 1;
+      .google.protobuf.UInt32Value hash_balance_factor = 2;
+    }
+  }
+
+  message RefreshRate {
+    .google.protobuf.Duration base_interval = 1;
+    .google.protobuf.Duration max_interval = 2;
+  }
+
+  message PreconnectPolicy {
+    .google.protobuf.DoubleValue per_upstream_preconnect_ratio = 1;
+    .google.protobuf.DoubleValue predictive_preconnect_ratio = 2;
+  }
+
+  enum DiscoveryType {
+    STATIC = 0;
+    STRICT_DNS = 1;
+    LOGICAL_DNS = 2;
+    EDS = 3;
+    ORIGINAL_DST = 4;
+  }
+
+  enum LbPolicy {
+    ROUND_ROBIN = 0;
+    LEAST_REQUEST = 1;
+    RING_HASH = 2;
+    RANDOM = 3;
+    MAGLEV = 5;
+    CLUSTER_PROVIDED = 6;
+    LOAD_BALANCING_POLICY_CONFIG = 7;
+  }
+
+  enum DnsLookupFamily {
+    AUTO = 0;
+    V4_ONLY = 1;
+    V6_ONLY = 2;
+    V4_PREFERRED = 3;
+    ALL = 4;
+  }
+
+  enum ClusterProtocolSelection {
+    USE_CONFIGURED_PROTOCOL = 0;
+    USE_DOWNSTREAM_PROTOCOL = 1;
+  }
+}
+
+message LoadBalancingPolicy {
+  repeated .envoy.config.cluster.v3.LoadBalancingPolicy.Policy policies = 1;
+
+  message Policy {
+    .envoy.config.core.v3.TypedExtensionConfig typed_extension_config = 4;
+  }
+}
+
+message UpstreamBindConfig {
+  .envoy.config.core.v3.Address source_address = 1;
+}
+
+message UpstreamConnectionOptions {
+  .envoy.config.core.v3.TcpKeepalive tcp_keepalive = 1;
+  bool set_local_interface_name_on_upstream_connections = 2;
+}
+
+message TrackClusterStats {
+  bool timeout_budgets = 1;
+  bool request_response_sizes = 2;
+}
+

@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "envoy/config/core/v3/socket_option.proto";
+import "google/protobuf/wrappers.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message Pipe {
+  string path = 1;
+  uint32 mode = 2;
+}
+
+message EnvoyInternalAddress {
+  oneof address_name_specifier {
+    string server_listener_name = 1;
+  }
+}
+
+message SocketAddress {
+  .envoy.config.core.v3.SocketAddress.Protocol protocol = 1;
+  string address = 2;
+  oneof port_specifier {
+    uint32 port_value = 3;
+    string named_port = 4;
+  }
+  string resolver_name = 5;
+  bool ipv4_compat = 6;
+
+  enum Protocol {
+    TCP = 0;
+    UDP = 1;
+  }
+}
+
+message TcpKeepalive {
+  .google.protobuf.UInt32Value keepalive_probes = 1;
+  .google.protobuf.UInt32Value keepalive_time = 2;
+  .google.protobuf.UInt32Value keepalive_interval = 3;
+}
+
+message BindConfig {
+  .envoy.config.core.v3.SocketAddress source_address = 1;
+  .google.protobuf.BoolValue freebind = 2;
+  repeated .envoy.config.core.v3.SocketOption socket_options = 3;
+}
+
+message Address {
+  oneof address {
+    .envoy.config.core.v3.SocketAddress socket_address = 1;
+    .envoy.config.core.v3.Pipe pipe = 2;
+    .envoy.config.core.v3.EnvoyInternalAddress envoy_internal_address = 3;
+  }
+}
+
+message CidrRange {
+  string address_prefix = 1;
+  .google.protobuf.UInt32Value prefix_len = 2;
+}
+

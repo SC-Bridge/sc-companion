@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package xds.type.matcher.v3;
+
+import "xds/annotations/v3/status.proto";
+import "xds/core/v3/extension.proto";
+import "xds/type/matcher/v3/string.proto";
+import "validate/validate.proto";
+
+message Matcher {
+  oneof matcher_type {
+    .xds.type.matcher.v3.Matcher.MatcherList matcher_list = 1;
+    .xds.type.matcher.v3.Matcher.MatcherTree matcher_tree = 2;
+  }
+  .xds.type.matcher.v3.Matcher.OnMatch on_no_match = 3;
+
+  message OnMatch {
+    oneof on_match {
+      .xds.type.matcher.v3.Matcher matcher = 1;
+      .xds.core.v3.TypedExtensionConfig action = 2;
+    }
+  }
+  message MatcherList {
+    repeated .xds.type.matcher.v3.Matcher.MatcherList.FieldMatcher matchers = 1;
+
+    message Predicate {
+      oneof match_type {
+        .xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate single_predicate = 1;
+        .xds.type.matcher.v3.Matcher.MatcherList.Predicate.PredicateList or_matcher = 2;
+        .xds.type.matcher.v3.Matcher.MatcherList.Predicate.PredicateList and_matcher = 3;
+        .xds.type.matcher.v3.Matcher.MatcherList.Predicate not_matcher = 4;
+      }
+
+      message SinglePredicate {
+        .xds.core.v3.TypedExtensionConfig input = 1;
+        oneof matcher {
+          .xds.type.matcher.v3.StringMatcher value_match = 2;
+          .xds.core.v3.TypedExtensionConfig custom_match = 3;
+        }
+      }
+      message PredicateList {
+        repeated .xds.type.matcher.v3.Matcher.MatcherList.Predicate predicate = 1;
+      }
+    }
+    message FieldMatcher {
+      .xds.type.matcher.v3.Matcher.MatcherList.Predicate predicate = 1;
+      .xds.type.matcher.v3.Matcher.OnMatch on_match = 2;
+    }
+  }
+  message MatcherTree {
+    .xds.core.v3.TypedExtensionConfig input = 1;
+    oneof tree_type {
+      .xds.type.matcher.v3.Matcher.MatcherTree.MatchMap exact_match_map = 2;
+      .xds.type.matcher.v3.Matcher.MatcherTree.MatchMap prefix_match_map = 3;
+      .xds.core.v3.TypedExtensionConfig custom_match = 4;
+    }
+
+    message MatchMap {
+      map<string, .xds.type.matcher.v3.Matcher.OnMatch> map = 1;
+
+    }
+  }
+}
+

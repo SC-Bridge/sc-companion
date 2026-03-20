@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/grpc_service.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+import "xds/core/v3/authority.proto";
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message ApiConfigSource {
+  .envoy.config.core.v3.ApiConfigSource.ApiType api_type = 1;
+  .envoy.config.core.v3.ApiVersion transport_api_version = 8;
+  repeated string cluster_names = 2;
+  repeated .envoy.config.core.v3.GrpcService grpc_services = 4;
+  .google.protobuf.Duration refresh_delay = 3;
+  .google.protobuf.Duration request_timeout = 5;
+  .envoy.config.core.v3.RateLimitSettings rate_limit_settings = 6;
+  bool set_node_on_first_message_only = 7;
+  repeated .envoy.config.core.v3.TypedExtensionConfig config_validators = 9;
+
+  enum ApiType {
+    DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0;
+    REST = 1;
+    GRPC = 2;
+    DELTA_GRPC = 3;
+    AGGREGATED_GRPC = 5;
+    AGGREGATED_DELTA_GRPC = 6;
+  }
+}
+
+message AggregatedConfigSource {
+}
+
+message SelfConfigSource {
+  .envoy.config.core.v3.ApiVersion transport_api_version = 1;
+}
+
+message RateLimitSettings {
+  .google.protobuf.UInt32Value max_tokens = 1;
+  .google.protobuf.DoubleValue fill_rate = 2;
+}
+
+message PathConfigSource {
+  string path = 1;
+  .envoy.config.core.v3.WatchedDirectory watched_directory = 2;
+}
+
+message ConfigSource {
+  repeated .xds.core.v3.Authority authorities = 7;
+  oneof config_source_specifier {
+    string path = 1 [ deprecated = true ];
+    .envoy.config.core.v3.PathConfigSource path_config_source = 8;
+    .envoy.config.core.v3.ApiConfigSource api_config_source = 2;
+    .envoy.config.core.v3.AggregatedConfigSource ads = 3;
+    .envoy.config.core.v3.SelfConfigSource self = 5;
+  }
+  .google.protobuf.Duration initial_fetch_timeout = 4;
+  .envoy.config.core.v3.ApiVersion resource_api_version = 6;
+}
+
+message ExtensionConfigSource {
+  .envoy.config.core.v3.ConfigSource config_source = 1;
+  .google.protobuf.Any default_config = 2;
+  bool apply_default_config_without_warming = 3;
+  repeated string type_urls = 4;
+}
+
+enum ApiVersion {
+  AUTO = 0;
+  V2 = 1;
+  V3 = 2;
+}
+

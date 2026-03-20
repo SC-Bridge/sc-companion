@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package google.type;
+
+message Expr {
+  string expression = 1;
+  string title = 2;
+  string description = 3;
+  string location = 4;
+}
+

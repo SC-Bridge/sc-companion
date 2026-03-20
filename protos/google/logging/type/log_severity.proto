@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package google.logging.type;
+
+import "google/api/annotations.proto";
+option csharp_namespace = "Google.Cloud.Logging.Type";
+
+enum LogSeverity {
+  DEFAULT = 0;
+  DEBUG = 100;
+  INFO = 200;
+  NOTICE = 300;
+  WARNING = 400;
+  ERROR = 500;
+  CRITICAL = 600;
+  ALERT = 700;
+  EMERGENCY = 800;
+}
+

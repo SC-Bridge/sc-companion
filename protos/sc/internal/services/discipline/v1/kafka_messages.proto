@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package sc.internal.services.discipline.v1;
+
+import "sc/external/services/discipline/v1/types.proto";
+
+message SanctionEvent {
+  string id = 1;
+  int32 account_id = 2;
+  repeated .sc.external.services.discipline.v1.Measure measures = 3;
+}
+
+message KafkaEventSanction {
+  string name = 1;
+  .sc.internal.services.discipline.v1.SanctionEvent body = 2;
+}
+

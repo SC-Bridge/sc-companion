@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package udpa.annotations;
+
+import "google/protobuf/descriptor.proto";
+
+message VersioningAnnotation {
+  string previous_message_type = 1;
+}
+
+
+// Extensions for .google.protobuf.MessageOptions
+
+extend .google.protobuf.MessageOptions {
+  .udpa.annotations.VersioningAnnotation versioning = 7881811;
+}

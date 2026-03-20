@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package udpa.annotations;
+
+import "google/protobuf/descriptor.proto";
+
+message MigrateAnnotation {
+  string rename = 1;
+}
+
+message FieldMigrateAnnotation {
+  string rename = 1;
+  string oneof_promotion = 2;
+}
+
+message FileMigrateAnnotation {
+  string move_to_package = 2;
+}
+
+
+// Extensions for .google.protobuf.MessageOptions
+
+extend .google.protobuf.MessageOptions {
+  .udpa.annotations.MigrateAnnotation message_migrate = 171962766;
+}
+
+// Extensions for .google.protobuf.FieldOptions
+
+extend .google.protobuf.FieldOptions {
+  .udpa.annotations.FieldMigrateAnnotation field_migrate = 171962766;
+}
+
+// Extensions for .google.protobuf.EnumOptions
+
+extend .google.protobuf.EnumOptions {
+  .udpa.annotations.MigrateAnnotation enum_migrate = 171962766;
+}
+
+// Extensions for .google.protobuf.EnumValueOptions
+
+extend .google.protobuf.EnumValueOptions {
+  .udpa.annotations.MigrateAnnotation enum_value_migrate = 171962766;
+}
+
+// Extensions for .google.protobuf.FileOptions
+
+extend .google.protobuf.FileOptions {
+  .udpa.annotations.FileMigrateAnnotation file_migrate = 171962766;
+}

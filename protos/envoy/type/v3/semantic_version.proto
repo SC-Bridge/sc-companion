@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package envoy.type.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+message SemanticVersion {
+  uint32 major_number = 1;
+  uint32 minor_number = 2;
+  uint32 patch = 3;
+}
+

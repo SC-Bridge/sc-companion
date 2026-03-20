@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package sc.external.services.squad.v1;
+
+import "google/api/annotations.proto";
+import "sc/external/services/squad/v1/types.proto";
+
+service SquadService {
+  rpc UpdateSettings ( .sc.external.services.squad.v1.UpdateSettingsRequest ) returns ( .sc.external.services.squad.v1.UpdateSettingsResponse );
+  rpc Create ( .sc.external.services.squad.v1.CreateRequest ) returns ( .sc.external.services.squad.v1.CreateResponse );
+  rpc CreateFromParty ( .sc.external.services.squad.v1.CreateFromPartyRequest ) returns ( .sc.external.services.squad.v1.CreateFromPartyResponse );
+  rpc Get ( .sc.external.services.squad.v1.GetRequest ) returns ( .sc.external.services.squad.v1.GetResponse );
+  rpc FindMatch ( .sc.external.services.squad.v1.FindMatchRequest ) returns ( .sc.external.services.squad.v1.FindMatchResponse );
+  rpc AutoRequeue ( .sc.external.services.squad.v1.AutoRequeueRequest ) returns ( .sc.external.services.squad.v1.AutoRequeueResponse );
+  rpc RecoverMatch ( .sc.external.services.squad.v1.RecoverMatchRequest ) returns ( .sc.external.services.squad.v1.RecoverMatchResponse );
+}
+
+message UpdateSettingsRequest {
+  string group_id = 1;
+  .sc.external.services.squad.v1.SquadSettings settings = 2;
+}
+
+message UpdateSettingsResponse {}
+
+message CreateRequest {
+  .sc.external.services.squad.v1.SquadSettings settings = 1;
+}
+
+message CreateResponse {
+  .sc.external.services.squad.v1.Squad squad = 1;
+}
+
+message CreateFromPartyRequest {
+  .sc.external.services.squad.v1.SquadSettings settings = 1;
+}
+
+message CreateFromPartyResponse {
+  .sc.external.services.squad.v1.Squad squad = 1;
+}
+
+message GetRequest {
+  string group_id = 1;
+}
+
+message GetResponse {
+  .sc.external.services.squad.v1.Squad squad = 1;
+}
+
+message FindMatchRequest {}
+
+message FindMatchResponse {}
+
+message AutoRequeueRequest {}
+
+message AutoRequeueResponse {}
+
+message RecoverMatchRequest {
+  bool rejoin = 1;
+}
+
+message RecoverMatchResponse {
+  string match_instance_id = 1;
+}
+

@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package envoy.config.cluster.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/type/v3/percent.proto";
+import "google/protobuf/wrappers.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message CircuitBreakers {
+  repeated .envoy.config.cluster.v3.CircuitBreakers.Thresholds thresholds = 1;
+  repeated .envoy.config.cluster.v3.CircuitBreakers.Thresholds per_host_thresholds = 2;
+
+  message Thresholds {
+    .envoy.config.core.v3.RoutingPriority priority = 1;
+    .google.protobuf.UInt32Value max_connections = 2;
+    .google.protobuf.UInt32Value max_pending_requests = 3;
+    .google.protobuf.UInt32Value max_requests = 4;
+    .google.protobuf.UInt32Value max_retries = 5;
+    .envoy.config.cluster.v3.CircuitBreakers.Thresholds.RetryBudget retry_budget = 8;
+    bool track_remaining = 6;
+    .google.protobuf.UInt32Value max_connection_pools = 7;
+
+    message RetryBudget {
+      .envoy.type.v3.Percent budget_percent = 1;
+      .google.protobuf.UInt32Value min_retry_concurrency = 2;
+    }
+  }
+}
+

@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package envoy.type.matcher.v3;
+
+import "google/protobuf/wrappers.proto";
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message RegexMatcher {
+  oneof engine_type {
+    .envoy.type.matcher.v3.RegexMatcher.GoogleRE2 google_re2 = 1 [ deprecated = true ];
+  }
+  string regex = 2;
+
+  message GoogleRE2 {
+    .google.protobuf.UInt32Value max_program_size = 1 [ deprecated = true ];
+  }
+}
+
+message RegexMatchAndSubstitute {
+  .envoy.type.matcher.v3.RegexMatcher pattern = 1;
+  string substitution = 2;
+}
+

@@ -1,0 +1,138 @@
+syntax = "proto3";
+
+package sc.internal.services.instance_manager.v1;
+
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+import "sc/external/common/api/v1/pagination.proto";
+import "sc/external/common/api/v1/query.proto";
+import "sc/external/services/instance_manager/v1/types.proto";
+
+service InstanceManagerService {
+  rpc EnsureInstance ( .sc.internal.services.instance_manager.v1.EnsureInstanceRequest ) returns ( .sc.internal.services.instance_manager.v1.EnsureInstanceResponse );
+  rpc ReleaseInstance ( .sc.internal.services.instance_manager.v1.ReleaseInstanceRequest ) returns ( .sc.internal.services.instance_manager.v1.ReleaseInstanceResponse );
+  rpc GetInstance ( .sc.internal.services.instance_manager.v1.GetInstanceRequest ) returns ( .sc.internal.services.instance_manager.v1.GetInstanceResponse );
+  rpc GetInstancesActivityReports ( .sc.internal.services.instance_manager.v1.GetInstancesActivityReportsRequest ) returns ( .sc.internal.services.instance_manager.v1.GetInstancesActivityReportsResponse );
+  rpc GetAvailableInstances ( .sc.internal.services.instance_manager.v1.GetAvailableInstancesRequest ) returns ( .sc.internal.services.instance_manager.v1.GetAvailableInstancesResponse );
+  rpc QueryInstances ( .sc.internal.services.instance_manager.v1.QueryInstancesRequest ) returns ( .sc.internal.services.instance_manager.v1.QueryInstancesResponse );
+  rpc SendHeartbeat ( .sc.internal.services.instance_manager.v1.SendHeartbeatRequest ) returns ( .sc.internal.services.instance_manager.v1.SendHeartbeatResponse );
+  rpc EnterInstance ( .sc.internal.services.instance_manager.v1.EnterInstanceRequest ) returns ( .sc.internal.services.instance_manager.v1.EnterInstanceResponse );
+  rpc ExitInstance ( .sc.internal.services.instance_manager.v1.ExitInstanceRequest ) returns ( .sc.internal.services.instance_manager.v1.ExitInstanceResponse );
+  rpc ProvisionInstancePools ( .sc.internal.services.instance_manager.v1.ProvisionInstancePoolsRequest ) returns ( .sc.internal.services.instance_manager.v1.ProvisionInstancePoolsResponse );
+  rpc CleanupInstancePools ( .sc.internal.services.instance_manager.v1.CleanupInstancePoolsRequest ) returns ( .sc.internal.services.instance_manager.v1.CleanupInstancePoolsResponse );
+}
+
+message EnsureInstanceRequest {
+  string instance_identifier = 1;
+  string shard_id = 2;
+  string requester_urn = 3;
+  string stow_inventory_id = 4;
+  .sc.external.services.instance_manager.v1.InstanceTemplate template = 5;
+}
+
+message EnsureInstanceResponse {
+  uint64 instance_geid = 1;
+  .sc.external.services.instance_manager.v1.InstanceStatus status = 2;
+}
+
+message ReleaseInstanceRequest {
+  oneof identifier {
+    uint64 instance_geid = 1;
+    string requester_urn = 2;
+  }
+  string shard_id = 3;
+  string instance_identifier = 4;
+}
+
+message ReleaseInstanceResponse {
+  .sc.external.services.instance_manager.v1.InstanceStatus status = 1;
+}
+
+message GetInstanceRequest {
+  oneof identifier {
+    uint64 instance_geid = 1;
+    string requester_urn = 2;
+  }
+  string shard_id = 3;
+  string instance_identifier = 4;
+}
+
+message GetInstanceResponse {
+  .sc.external.services.instance_manager.v1.Instance instance = 1;
+}
+
+message GetInstancesActivityReportsRequest {
+  repeated uint64 instance_geids = 1;
+}
+
+message GetInstancesActivityReportsResponse {
+  map<uint64, .sc.external.services.instance_manager.v1.InstanceActivityReport> reports = 1;
+
+}
+
+message GetAvailableInstancesRequest {
+  repeated string instance_identifiers = 1;
+  string shard_id = 2;
+  string requester_urn = 3;
+}
+
+message GetAvailableInstancesResponse {
+  repeated .sc.external.services.instance_manager.v1.Instance instances = 1;
+}
+
+message QueryInstancesRequest {
+  .sc.external.common.api.v1.Query query = 1;
+  .sc.external.common.api.v1.PaginationArguments pagination = 2;
+}
+
+message QueryInstancesResponse {
+  repeated .sc.external.services.instance_manager.v1.Instance results = 1;
+  .sc.external.common.api.v1.PaginationInfo page_info = 2;
+}
+
+message SendHeartbeatRequest {
+  .sc.external.services.instance_manager.v1.InstanceHeartbeat heartbeat = 1;
+}
+
+message SendHeartbeatResponse {}
+
+message EnterInstanceRequest {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+  string requester_urn = 3;
+  string role_name = 4;
+}
+
+message EnterInstanceResponse {}
+
+message ExitInstanceRequest {
+  uint64 instance_geid = 1;
+  string requester_urn = 2;
+  string role_name = 3;
+}
+
+message ExitInstanceResponse {
+  .sc.external.services.instance_manager.v1.InstanceStatus status = 1;
+}
+
+message ProvisionInstancePoolsRequest {
+  string shard_id = 1;
+  repeated .sc.internal.services.instance_manager.v1.ProvisionInstancePoolsRequest.PoolConfiguration pools = 2;
+
+  message PoolConfiguration {
+    string instance_identifier = 1;
+    .sc.external.services.instance_manager.v1.InstanceTemplate template = 2;
+    int32 pool_size = 3;
+  }
+}
+
+message ProvisionInstancePoolsResponse {}
+
+message CleanupInstancePoolsRequest {
+  string shard_id = 1;
+  bool cleanup_all = 2;
+  repeated string instance_identifiers = 3;
+}
+
+message CleanupInstancePoolsResponse {}
+

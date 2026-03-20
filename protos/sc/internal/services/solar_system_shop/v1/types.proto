@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package sc.internal.services.solar_system_shop.v1;
+
+message RentalOffering {
+  int32 days = 1;
+  double price = 2;
+}
+
+message InventoryItem {
+  string shop_inventory_id = 1;
+  string id = 2;
+  double buy_price = 3;
+  double sell_price = 4;
+  int32 current_inventory = 5;
+  int32 max_inventory = 6;
+  string timestamp = 7;
+  int32 gold_licenses_required = 8;
+  int32 platinum_licenses_required = 9;
+  repeated .sc.internal.services.solar_system_shop.v1.RentalOffering rental_offerings = 10;
+}
+
+message ShopInventory {
+  repeated .sc.internal.services.solar_system_shop.v1.InventoryItem inventory = 1;
+}
+

@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package sc.external.services.custom_lobby.v1;
+
+import "google/api/annotations.proto";
+import "sc/external/services/custom_lobby/v1/types.proto";
+
+service CustomLobbyService {
+  rpc ChangeTeam ( .sc.external.services.custom_lobby.v1.ChangeTeamRequest ) returns ( .sc.external.services.custom_lobby.v1.ChangeTeamResponse );
+  rpc ChangeTeammateTeam ( .sc.external.services.custom_lobby.v1.ChangeTeammateTeamRequest ) returns ( .sc.external.services.custom_lobby.v1.ChangeTeammateTeamResponse );
+  rpc Get ( .sc.external.services.custom_lobby.v1.GetRequest ) returns ( .sc.external.services.custom_lobby.v1.GetResponse );
+  rpc Create ( .sc.external.services.custom_lobby.v1.CreateRequest ) returns ( .sc.external.services.custom_lobby.v1.CreateResponse );
+  rpc UpdateSettings ( .sc.external.services.custom_lobby.v1.UpdateSettingsRequest ) returns ( .sc.external.services.custom_lobby.v1.UpdateSettingsResponse );
+  rpc FindMatch ( .sc.external.services.custom_lobby.v1.FindMatchRequest ) returns ( .sc.external.services.custom_lobby.v1.FindMatchResponse );
+  rpc Join ( .sc.external.services.custom_lobby.v1.JoinRequest ) returns ( .sc.external.services.custom_lobby.v1.JoinResponse );
+}
+
+message ChangeTeamRequest {
+  string destination_team_id = 1;
+}
+
+message ChangeTeamResponse {}
+
+message ChangeTeammateTeamRequest {
+  string destination_team_id = 1;
+  string member_urn = 2;
+}
+
+message ChangeTeammateTeamResponse {}
+
+message GetRequest {
+  string group_id = 1;
+}
+
+message GetResponse {
+  .sc.external.services.custom_lobby.v1.CustomLobby custom_lobby = 1;
+}
+
+message CreateRequest {
+  .sc.external.services.custom_lobby.v1.CustomLobbySettings settings = 1;
+  string password = 2;
+}
+
+message CreateResponse {
+  .sc.external.services.custom_lobby.v1.CustomLobby custom_lobby = 1;
+}
+
+message UpdateSettingsRequest {
+  .sc.external.services.custom_lobby.v1.CustomLobbySettings settings = 1;
+  string password = 2;
+}
+
+message UpdateSettingsResponse {}
+
+message FindMatchRequest {}
+
+message FindMatchResponse {}
+
+message JoinRequest {
+  string group_id = 1;
+  string password = 2;
+}
+
+message JoinResponse {}
+

@@ -1,66 +1,87 @@
 package grpcproxy
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"strings"
 	"sync"
 
+	"google.golang.org/grpc"
+
 	"github.com/SC-Bridge/sc-companion/internal/events"
+	"github.com/SC-Bridge/sc-companion/internal/grpcproxy/descriptors"
 )
 
-// blockedServices are excluded from capture (PII / real money).
-var blockedServices = map[string]bool{
-	"login":          true,
-	"eatransaction":  true,
-}
-
-// Proxy is a transparent TLS MITM proxy that intercepts gRPC traffic
-// to CIG's backend and extracts game data from protobuf payloads.
+// Proxy is an HTTP CONNECT proxy that intercepts gRPC traffic via TLS MITM.
 type Proxy struct {
 	listenAddr string
-	targetHost string
 	bus        *events.Bus
-	caCert     tls.Certificate
-	mu         sync.RWMutex
-	running    bool
+	certCache  *LeafCertCache
+	handler    *Handler
+
+	// connTargets maps connection local addresses to their intended backend.
+	// Populated before handing the connection to gRPC, read by the handler.
+	connTargets sync.Map // localAddr string → target string
+
+	mu      sync.RWMutex
+	running bool
 }
 
-// Config holds gRPC proxy configuration.
-type Config struct {
-	ListenAddr string // local address to listen on (e.g. ":8443")
-	TargetHost string // CIG backend (e.g. "pub-sc-alpha-460-11135423.test1.cloudimperiumgames.com:443")
-	CACertFile string // path to CA certificate for MITM
-	CAKeyFile  string // path to CA private key for MITM
+// ProxyConfig holds proxy configuration.
+type ProxyConfig struct {
+	ListenAddr string // e.g. "127.0.0.1:8443"
+	CADir      string // directory containing ca.crt and ca.key
 }
 
-// New creates a new gRPC MITM proxy.
-func New(cfg Config, bus *events.Bus) (*Proxy, error) {
-	caCert, err := tls.LoadX509KeyPair(cfg.CACertFile, cfg.CAKeyFile)
+// NewProxy creates a new HTTP CONNECT proxy with gRPC interception.
+func NewProxy(cfg ProxyConfig, bus *events.Bus) (*Proxy, error) {
+	// Load or generate CA
+	ca, created, err := EnsureCA(cfg.CADir)
 	if err != nil {
-		return nil, fmt.Errorf("load CA cert: %w", err)
+		return nil, fmt.Errorf("ensure CA: %w", err)
+	}
+	if created {
+		slog.Info("new CA certificate generated — install it to intercept gRPC traffic",
+			"path", CACertPath(cfg.CADir),
+			"install", fmt.Sprintf("certutil -addstore Root \"%s\"", CACertPath(cfg.CADir)),
+		)
 	}
 
-	return &Proxy{
+	certCache, err := NewLeafCertCache(ca)
+	if err != nil {
+		return nil, fmt.Errorf("create cert cache: %w", err)
+	}
+
+	// Load proto registry
+	registry, err := NewRegistry(descriptors.DescriptorSet)
+	if err != nil {
+		return nil, fmt.Errorf("load proto registry: %w", err)
+	}
+	slog.Info("proto registry loaded", "methods", registry.MethodCount())
+
+	// Build decoder + handler
+	decoder := NewDecoder(registry, bus)
+	handler := NewHandler(decoder)
+
+	p := &Proxy{
 		listenAddr: cfg.ListenAddr,
-		targetHost: cfg.TargetHost,
 		bus:        bus,
-		caCert:     caCert,
-	}, nil
+		certCache:  certCache,
+		handler:    handler,
+	}
+
+	return p, nil
 }
 
-// Run starts the proxy listener. Blocks until ctx is cancelled.
+// Run starts the HTTP CONNECT proxy. Blocks until ctx is cancelled.
 func (p *Proxy) Run(ctx context.Context) error {
-	// Generate a TLS config that presents certs signed by our CA
-	tlsConfig := &tls.Config{
-		GetCertificate: p.getCertificate,
-	}
-
-	listener, err := tls.Listen("tcp", p.listenAddr, tlsConfig)
+	listener, err := net.Listen("tcp", p.listenAddr)
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
@@ -70,10 +91,11 @@ func (p *Proxy) Run(ctx context.Context) error {
 	p.running = true
 	p.mu.Unlock()
 
-	slog.Info("gRPC proxy listening", "addr", p.listenAddr, "target", p.targetHost)
+	slog.Info("gRPC proxy listening", "addr", p.listenAddr)
 
 	go func() {
 		<-ctx.Done()
+		p.handler.Close()
 		listener.Close()
 	}()
 
@@ -86,7 +108,7 @@ func (p *Proxy) Run(ctx context.Context) error {
 			slog.Error("accept error", "error", err)
 			continue
 		}
-		go p.handleConn(ctx, conn)
+		go p.handleConnect(conn)
 	}
 }
 
@@ -97,137 +119,138 @@ func (p *Proxy) IsRunning() bool {
 	return p.running
 }
 
-func (p *Proxy) handleConn(ctx context.Context, clientConn net.Conn) {
-	defer clientConn.Close()
+// handleConnect processes an HTTP CONNECT request.
+func (p *Proxy) handleConnect(conn net.Conn) {
+	defer conn.Close()
 
-	// Connect to the real CIG backend
-	backendConn, err := tls.Dial("tcp", p.targetHost, &tls.Config{
-		InsecureSkipVerify: false,
-		ServerName:         stripPort(p.targetHost),
-	})
+	br := bufio.NewReader(conn)
+	req, err := http.ReadRequest(br)
 	if err != nil {
-		slog.Error("backend dial failed", "error", err)
+		slog.Debug("failed to read CONNECT request", "error", err)
+		return
+	}
+
+	if req.Method != http.MethodConnect {
+		resp := &http.Response{
+			StatusCode: http.StatusMethodNotAllowed,
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+		}
+		resp.Write(conn)
+		return
+	}
+
+	targetHost := req.Host
+	slog.Debug("CONNECT", "target", targetHost)
+
+	// Respond 200 to establish the tunnel
+	conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+
+	// Wrap the connection in TLS, presenting a leaf cert for the target host
+	tlsConfig := &tls.Config{
+		GetCertificate: p.certCache.GetCertificate,
+		NextProtos:     []string{"h2", "http/1.1"},
+	}
+
+	tlsConn := tls.Server(conn, tlsConfig)
+	if err := tlsConn.Handshake(); err != nil {
+		slog.Debug("TLS handshake failed", "target", targetHost, "error", err)
+		return
+	}
+	defer tlsConn.Close()
+
+	negotiatedProto := tlsConn.ConnectionState().NegotiatedProtocol
+
+	if negotiatedProto == "h2" {
+		// HTTP/2 → hand to gRPC server for interception
+		p.serveGRPC(tlsConn, targetHost)
+	} else {
+		// Not h2 → plain passthrough to real backend
+		p.passthrough(tlsConn, targetHost)
+	}
+}
+
+// serveGRPC creates a per-connection gRPC server and forwards all calls
+// to the real backend while decoding payloads asynchronously.
+func (p *Proxy) serveGRPC(conn net.Conn, targetHost string) {
+	// Ensure the target has a port for dialing
+	backendAddr := targetHost
+	if !strings.Contains(backendAddr, ":") {
+		backendAddr = backendAddr + ":443"
+	}
+
+	// Create a per-connection gRPC server with the target baked in
+	srv := grpc.NewServer(
+		grpc.ForceServerCodec(RawCodec{}),
+		grpc.UnknownServiceHandler(p.handler.TransparentHandler(backendAddr)),
+	)
+
+	// Serve on a single-connection listener
+	ln := &singleConnListener{conn: conn}
+	srv.Serve(ln)
+}
+
+// passthrough does a bidirectional TCP copy to the real backend for non-gRPC traffic.
+func (p *Proxy) passthrough(clientConn net.Conn, targetHost string) {
+	if !strings.Contains(targetHost, ":") {
+		targetHost = targetHost + ":443"
+	}
+
+	backendConn, err := tls.Dial("tcp", targetHost, &tls.Config{})
+	if err != nil {
+		slog.Debug("passthrough dial failed", "target", targetHost, "error", err)
 		return
 	}
 	defer backendConn.Close()
 
-	// Bidirectional copy with sniffing
 	var wg sync.WaitGroup
 	wg.Add(2)
-
-	// Client → Backend (requests)
 	go func() {
 		defer wg.Done()
-		p.copyWithSniff(backendConn, clientConn, "request")
+		io.Copy(backendConn, clientConn)
 	}()
-
-	// Backend → Client (responses)
 	go func() {
 		defer wg.Done()
-		p.copyWithSniff(clientConn, backendConn, "response")
+		io.Copy(clientConn, backendConn)
 	}()
-
 	wg.Wait()
 }
 
-func (p *Proxy) copyWithSniff(dst, src net.Conn, direction string) {
-	buf := make([]byte, 32*1024)
-	for {
-		n, err := src.Read(buf)
-		if n > 0 {
-			// Sniff the gRPC frame for service/method info
-			p.sniffFrame(buf[:n], direction)
-
-			if _, writeErr := dst.Write(buf[:n]); writeErr != nil {
-				return
-			}
-		}
-		if err != nil {
-			return
-		}
-	}
+// singleConnListener is a net.Listener that serves exactly one connection.
+type singleConnListener struct {
+	conn net.Conn
+	done bool
+	mu   sync.Mutex
 }
 
-// sniffFrame attempts to extract gRPC metadata from an HTTP/2 frame.
-// This is a best-effort parser — full HTTP/2 frame parsing would be more robust
-// but this catches the :path header which contains the service/method.
-func (p *Proxy) sniffFrame(data []byte, direction string) {
-	// Look for gRPC :path header in HTTP/2 HEADERS frame
-	// Format: /package.ServiceName/MethodName
-	content := string(data)
-
-	// Find service paths like "/sc.external.services.ledger.v1.LedgerService/GetFunds"
-	for i := 0; i < len(content)-1; i++ {
-		if content[i] == '/' && i+1 < len(content) && content[i+1] == 's' {
-			// Look for "sc.external.services." or "sc.internal.services."
-			end := strings.IndexByte(content[i+1:], 0)
-			if end < 0 {
-				end = len(content) - i - 1
-			}
-			path := content[i : i+1+end]
-
-			if strings.Contains(path, "sc.external.services.") || strings.Contains(path, "sc.internal.services.") {
-				parts := strings.Split(path, "/")
-				if len(parts) >= 3 {
-					serviceFull := parts[1]
-					method := parts[2]
-
-					// Extract short service name for filtering
-					serviceParts := strings.Split(serviceFull, ".")
-					shortName := ""
-					if len(serviceParts) >= 4 {
-						shortName = serviceParts[3] // e.g. "ledger", "reputation"
-					}
-
-					if blockedServices[shortName] {
-						return
-					}
-
-					p.bus.Publish(events.Event{
-						Type:   "grpc_call",
-						Source: "grpc",
-						Data: map[string]string{
-							"service":   serviceFull,
-							"method":    method,
-							"direction": direction,
-							"short":     shortName,
-						},
-					})
-				}
-				return
-			}
-		}
+func (l *singleConnListener) Accept() (net.Conn, error) {
+	l.mu.Lock()
+	if l.done {
+		l.mu.Unlock()
+		// Block until the connection closes — gRPC server will notice
+		// when it tries to read from the closed connection.
+		select {}
 	}
+	l.done = true
+	conn := l.conn
+	l.mu.Unlock()
+	return conn, nil
 }
 
-func (p *Proxy) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	// Generate a certificate for the requested hostname, signed by our CA
-	cert, err := generateCert(hello.ServerName, &p.caCert)
-	if err != nil {
-		return nil, err
-	}
-	return cert, nil
-}
+func (l *singleConnListener) Close() error   { return nil }
+func (l *singleConnListener) Addr() net.Addr { return l.conn.LocalAddr() }
 
-func stripPort(hostPort string) string {
-	host, _, err := net.SplitHostPort(hostPort)
-	if err != nil {
-		return hostPort
-	}
-	return host
-}
+// Context key for target host (used if we need context-based lookup later).
+type contextKey string
 
-// generateCert creates a TLS certificate for the given hostname, signed by the CA.
-func generateCert(hostname string, ca *tls.Certificate) (*tls.Certificate, error) {
-	caCert, err := x509.ParseCertificate(ca.Certificate[0])
-	if err != nil {
-		return nil, err
-	}
+const targetKey contextKey = "grpc-proxy-target"
 
-	// For now, return the CA cert itself — a proper implementation would
-	// generate a per-host certificate signed by the CA.
-	// TODO: implement proper per-host cert generation
-	_ = caCert
-	_ = hostname
-	return ca, nil
+// targetFromContext extracts the backend target host from a context.
+func targetFromContext(ctx context.Context) (string, bool) {
+	v := ctx.Value(targetKey)
+	if v == nil {
+		return "", false
+	}
+	s, ok := v.(string)
+	return s, ok
 }

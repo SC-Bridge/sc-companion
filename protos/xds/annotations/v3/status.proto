@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package xds.annotations.v3;
+
+import "google/protobuf/descriptor.proto";
+
+message FileStatusAnnotation {
+  bool work_in_progress = 1;
+}
+
+message MessageStatusAnnotation {
+  bool work_in_progress = 1;
+}
+
+message FieldStatusAnnotation {
+  bool work_in_progress = 1;
+}
+
+message StatusAnnotation {
+  bool work_in_progress = 1;
+  .xds.annotations.v3.PackageVersionStatus package_version_status = 2;
+}
+
+enum PackageVersionStatus {
+  UNKNOWN = 0;
+  FROZEN = 1;
+  ACTIVE = 2;
+  NEXT_MAJOR_VERSION_CANDIDATE = 3;
+}
+
+
+// Extensions for .google.protobuf.FileOptions
+
+extend .google.protobuf.FileOptions {
+  .xds.annotations.v3.FileStatusAnnotation file_status = 226829418;
+}
+
+// Extensions for .google.protobuf.MessageOptions
+
+extend .google.protobuf.MessageOptions {
+  .xds.annotations.v3.MessageStatusAnnotation message_status = 226829418;
+}
+
+// Extensions for .google.protobuf.FieldOptions
+
+extend .google.protobuf.FieldOptions {
+  .xds.annotations.v3.FieldStatusAnnotation field_status = 226829418;
+}

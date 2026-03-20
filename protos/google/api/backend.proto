@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package google.api;
+
+message Backend {
+  repeated .google.api.BackendRule rules = 1;
+}
+
+message BackendRule {
+  string selector = 1;
+  string address = 2;
+  double deadline = 3;
+  double min_deadline = 4;
+}
+

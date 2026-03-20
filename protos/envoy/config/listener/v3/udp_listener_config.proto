@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package envoy.config.listener.v3;
+
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/udp_socket_config.proto";
+import "envoy/config/listener/v3/quic_config.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+message UdpListenerConfig {
+  .envoy.config.core.v3.UdpSocketConfig downstream_socket_config = 5;
+  .envoy.config.listener.v3.QuicProtocolOptions quic_options = 7;
+  .envoy.config.core.v3.TypedExtensionConfig udp_packet_packet_writer_config = 8;
+}
+
+message ActiveRawUdpListenerConfig {
+}
+

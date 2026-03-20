@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package udpa.annotations;
+
+import "google/protobuf/descriptor.proto";
+
+
+// Extensions for .google.protobuf.FieldOptions
+
+extend .google.protobuf.FieldOptions {
+  bool sensitive = 76569463;
+}

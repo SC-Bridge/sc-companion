@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package sc.external.services.land_claim.v1;
+
+import "google/type/latlng.proto";
+import "google/protobuf/timestamp.proto";
+
+message Plot {
+  string id = 1;
+  .google.type.LatLng bottom_left = 2;
+  .google.type.LatLng top_right = 3;
+}
+
+message LandClaim {
+  string id = 1;
+  uint32 location_id = 2;
+  string owner_urn = 3;
+  repeated .sc.external.services.land_claim.v1.Plot plots = 4;
+  .sc.external.services.land_claim.v1.ClaimType type = 5;
+  .sc.external.services.land_claim.v1.LandClaim.Tax tax_history = 6;
+
+  message Tax {
+    .google.protobuf.Timestamp last_paid_at = 1;
+    .google.protobuf.Timestamp last_processed_at = 2;
+  }
+}
+
+message AreaFilter {
+  uint32 location_id = 1;
+  repeated .google.type.LatLng area = 2;
+}
+
+enum ClaimType {
+  CLAIM_TYPE_UNSPECIFIED = 0;
+  CLAIM_TYPE_GENERAL = 1;
+  CLAIM_TYPE_PROSPECTING = 2;
+  CLAIM_TYPE_BEACON = 3;
+}
+

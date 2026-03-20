@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.type.matcher.v3;
+
+import "envoy/type/matcher/v3/regex.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message StringMatcher {
+  oneof match_pattern {
+    string exact = 1;
+    string prefix = 2;
+    string suffix = 3;
+    .envoy.type.matcher.v3.RegexMatcher safe_regex = 5;
+    string contains = 7;
+  }
+  bool ignore_case = 6;
+}
+
+message ListStringMatcher {
+  repeated .envoy.type.matcher.v3.StringMatcher patterns = 1;
+}
+

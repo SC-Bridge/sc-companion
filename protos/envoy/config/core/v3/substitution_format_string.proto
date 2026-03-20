@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
+import "google/protobuf/struct.proto";
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+message SubstitutionFormatString {
+  oneof format {
+    string text_format = 1 [ deprecated = true ];
+    .google.protobuf.Struct json_format = 2;
+    .envoy.config.core.v3.DataSource text_format_source = 5;
+  }
+  bool omit_empty_values = 3;
+  string content_type = 4;
+  repeated .envoy.config.core.v3.TypedExtensionConfig formatters = 6;
+}
+

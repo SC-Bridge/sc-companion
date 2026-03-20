@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package sc.external.common.time.v1;
+
+import "google/protobuf/timestamp.proto";
+
+message Continuous {}
+
+message Recurrence {
+  string cron = 1;
+  uint32 duration_seconds = 2;
+}
+
+message Schedule {
+  .google.protobuf.Timestamp start_ts = 1;
+  .google.protobuf.Timestamp end_ts = 2;
+  oneof run_pattern {
+    .sc.external.common.time.v1.Continuous continuous = 3;
+    .sc.external.common.time.v1.Recurrence recurring = 4;
+  }
+  bool enabled = 5;
+  string resolved_expression = 6;
+}
+

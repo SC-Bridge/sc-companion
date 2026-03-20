@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package sc.internal.services.custom_lobby.v1;
+
+import "google/api/annotations.proto";
+import "sc/external/services/custom_lobby/v1/types.proto";
+
+service CustomLobbyService {
+  rpc Get ( .sc.internal.services.custom_lobby.v1.GetRequest ) returns ( .sc.internal.services.custom_lobby.v1.GetResponse );
+}
+
+message GetRequest {
+  string group_id = 1;
+}
+
+message GetResponse {
+  .sc.external.services.custom_lobby.v1.CustomLobby custom_lobby = 1;
+}
+

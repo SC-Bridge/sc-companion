@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package google.api;
+
+import "google/api/annotations.proto";
+
+message Usage {
+  repeated string requirements = 1;
+  repeated .google.api.UsageRule rules = 6;
+  string producer_notification_channel = 7;
+}
+
+message UsageRule {
+  string selector = 1;
+  bool allow_unregistered_calls = 2;
+  bool skip_service_control = 3;
+}
+

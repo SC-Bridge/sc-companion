@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package google.api;
+
+import "google/protobuf/descriptor.proto";
+
+message ResourceDescriptor {
+  string type = 1;
+  repeated string pattern = 2;
+  string name_field = 3;
+  .google.api.ResourceDescriptor.History history = 4;
+  string plural = 5;
+  string singular = 6;
+
+  enum History {
+    HISTORY_UNSPECIFIED = 0;
+    ORIGINALLY_SINGLE_PATTERN = 1;
+    FUTURE_MULTI_PATTERN = 2;
+  }
+}
+
+message ResourceReference {
+  string type = 1;
+  string child_type = 2;
+}
+
+
+// Extensions for .google.protobuf.FieldOptions
+
+extend .google.protobuf.FieldOptions {
+  .google.api.ResourceReference resource_reference = 1055;
+}
+
+// Extensions for .google.protobuf.FileOptions
+
+extend .google.protobuf.FileOptions {
+  repeated .google.api.ResourceDescriptor resource_definition = 1053;
+}
+
+// Extensions for .google.protobuf.MessageOptions
+
+extend .google.protobuf.MessageOptions {
+  .google.api.ResourceDescriptor resource = 1053;
+}

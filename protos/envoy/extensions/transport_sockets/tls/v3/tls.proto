@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.tls.v3;
+
+import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/extensions/transport_sockets/tls/v3/common.proto";
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message UpstreamTlsContext {
+  .envoy.extensions.transport_sockets.tls.v3.CommonTlsContext common_tls_context = 1;
+  string sni = 2;
+  bool allow_renegotiation = 3;
+  .google.protobuf.UInt32Value max_session_keys = 4;
+}
+
+message DownstreamTlsContext {
+  .envoy.extensions.transport_sockets.tls.v3.CommonTlsContext common_tls_context = 1;
+  .google.protobuf.BoolValue require_client_certificate = 2;
+  .google.protobuf.BoolValue require_sni = 3;
+  oneof session_ticket_keys_type {
+    .envoy.extensions.transport_sockets.tls.v3.TlsSessionTicketKeys session_ticket_keys = 4;
+    .envoy.extensions.transport_sockets.tls.v3.SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
+    bool disable_stateless_session_resumption = 7;
+  }
+  .google.protobuf.Duration session_timeout = 6;
+  .envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy ocsp_staple_policy = 8;
+
+  enum OcspStaplePolicy {
+    LENIENT_STAPLING = 0;
+    STRICT_STAPLING = 1;
+    MUST_STAPLE = 2;
+  }
+}
+
+message TlsKeyLog {
+  string path = 1;
+  repeated .envoy.config.core.v3.CidrRange local_address_range = 2;
+  repeated .envoy.config.core.v3.CidrRange remote_address_range = 3;
+}
+
+message CommonTlsContext {
+  .envoy.extensions.transport_sockets.tls.v3.TlsParameters tls_params = 1;
+  repeated .envoy.extensions.transport_sockets.tls.v3.TlsCertificate tls_certificates = 2;
+  repeated .envoy.extensions.transport_sockets.tls.v3.SdsSecretConfig tls_certificate_sds_secret_configs = 6;
+  .envoy.extensions.transport_sockets.tls.v3.CertificateProviderPluginInstance tls_certificate_provider_instance = 14;
+  .envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProvider tls_certificate_certificate_provider = 9 [ deprecated = true ];
+  .envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProviderInstance tls_certificate_certificate_provider_instance = 11 [ deprecated = true ];
+  oneof validation_context_type {
+    .envoy.extensions.transport_sockets.tls.v3.CertificateValidationContext validation_context = 3;
+    .envoy.extensions.transport_sockets.tls.v3.SdsSecretConfig validation_context_sds_secret_config = 7;
+    .envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.CombinedCertificateValidationContext combined_validation_context = 8;
+    .envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProvider validation_context_certificate_provider = 10 [ deprecated = true ];
+    .envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProviderInstance validation_context_certificate_provider_instance = 12 [ deprecated = true ];
+  }
+  repeated string alpn_protocols = 4;
+  .envoy.config.core.v3.TypedExtensionConfig custom_handshaker = 13;
+  .envoy.extensions.transport_sockets.tls.v3.TlsKeyLog key_log = 15;
+
+  message CertificateProvider {
+    string name = 1;
+    oneof config {
+      .envoy.config.core.v3.TypedExtensionConfig typed_config = 2;
+    }
+  }
+  message CertificateProviderInstance {
+    string instance_name = 1;
+    string certificate_name = 2;
+  }
+  message CombinedCertificateValidationContext {
+    .envoy.extensions.transport_sockets.tls.v3.CertificateValidationContext default_validation_context = 1;
+    .envoy.extensions.transport_sockets.tls.v3.SdsSecretConfig validation_context_sds_secret_config = 2;
+    .envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProvider validation_context_certificate_provider = 3 [ deprecated = true ];
+    .envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProviderInstance validation_context_certificate_provider_instance = 4 [ deprecated = true ];
+  }
+}
+

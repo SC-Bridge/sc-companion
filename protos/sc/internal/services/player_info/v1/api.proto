@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package sc.internal.services.player_info.v1;
+
+import "google/api/annotations.proto";
+import "sc/internal/services/player_info/v1/types.proto";
+
+service PlayerInfoService {
+  rpc GetByAccountIds ( .sc.internal.services.player_info.v1.GetByAccountIdsRequest ) returns ( .sc.internal.services.player_info.v1.GetByAccountIdsResponse );
+  rpc GetByCharacterGeids ( .sc.internal.services.player_info.v1.GetByCharacterGeidsRequest ) returns ( .sc.internal.services.player_info.v1.GetByCharacterGeidsResponse );
+  rpc KickPlayer ( .sc.internal.services.player_info.v1.KickPlayerRequest ) returns ( .sc.internal.services.player_info.v1.KickPlayerResponse );
+}
+
+message GetByAccountIdsRequest {
+  repeated int32 account_ids = 1;
+}
+
+message GetByAccountIdsResponse {
+  int32 code = 1;
+  int32 num_account_ids = 2;
+  repeated .sc.internal.services.player_info.v1.PlayerInfo players = 3;
+}
+
+message GetByCharacterGeidsRequest {
+  repeated uint64 character_geids = 1;
+}
+
+message GetByCharacterGeidsResponse {
+  int32 code = 1;
+  int32 num_character_geids = 2;
+  repeated .sc.internal.services.player_info.v1.PlayerInfo players = 3;
+}
+
+message KickPlayerRequest {
+  int32 account_id = 1;
+}
+
+message KickPlayerResponse {
+  int32 account_id = 1;
+  bool was_online = 2;
+  bool kicked = 3;
+}
+

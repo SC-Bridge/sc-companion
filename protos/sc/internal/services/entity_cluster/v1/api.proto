@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package sc.internal.services.entity_cluster.v1;
+
+import "protoc-gen-openapiv2/options/annotations.proto";
+import "google/api/annotations.proto";
+import "sc/external/common/mission/v1/types.proto";
+
+service EntityClusterCommunicationService {
+  rpc AddClusterMember ( .sc.internal.services.entity_cluster.v1.AddClusterMemberRequest ) returns ( .sc.internal.services.entity_cluster.v1.AddClusterMemberResponse );
+  rpc RemoveClusterMember ( .sc.internal.services.entity_cluster.v1.RemoveClusterMemberRequest ) returns ( .sc.internal.services.entity_cluster.v1.RemoveClusterMemberResponse );
+  rpc RemoveCluster ( .sc.internal.services.entity_cluster.v1.RemoveClusterRequest ) returns ( .sc.internal.services.entity_cluster.v1.RemoveClusterResponse );
+  rpc RemoveAllClusters ( .sc.internal.services.entity_cluster.v1.RemoveAllClustersRequest ) returns ( .sc.internal.services.entity_cluster.v1.RemoveAllClustersResponse );
+  rpc UpdateClusterMemberVariables ( .sc.internal.services.entity_cluster.v1.UpdateClusterMemberVariablesRequest ) returns ( .sc.internal.services.entity_cluster.v1.UpdateClusterMemberVariablesResponse );
+  rpc GetClusterMember ( .sc.internal.services.entity_cluster.v1.GetClusterMemberRequest ) returns ( .sc.internal.services.entity_cluster.v1.GetClusterMemberResponse );
+  rpc GetCluster ( .sc.internal.services.entity_cluster.v1.GetClusterRequest ) returns ( .sc.internal.services.entity_cluster.v1.GetClusterResponse );
+}
+
+message AddClusterMemberRequest {
+  repeated .sc.external.common.mission.v1.ClusterMember members = 1;
+}
+
+message AddClusterMemberResponse {}
+
+message RemoveClusterMemberRequest {
+  string shard_id = 1;
+  string cluster_id = 2;
+  string member_id = 3;
+}
+
+message RemoveClusterMemberResponse {}
+
+message RemoveClusterRequest {
+  string shard_id = 1;
+  string cluster_id = 2;
+}
+
+message RemoveClusterResponse {}
+
+message RemoveAllClustersRequest {
+  string shard_id = 1;
+}
+
+message RemoveAllClustersResponse {}
+
+message UpdateClusterMemberVariablesRequest {
+  string shard_id = 1;
+  string cluster_id = 2;
+  string member_id = 3;
+  .sc.external.common.mission.v1.MissionVariables variables = 4;
+}
+
+message UpdateClusterMemberVariablesResponse {}
+
+message GetClusterMemberRequest {
+  string shard_id = 1;
+  string cluster_id = 2;
+  string member_id = 3;
+}
+
+message GetClusterMemberResponse {
+  .sc.external.common.mission.v1.ClusterMember member = 1;
+}
+
+message GetClusterRequest {
+  string shard_id = 2;
+  string cluster_id = 1;
+}
+
+message GetClusterResponse {
+  repeated .sc.external.common.mission.v1.ClusterMember members = 1;
+}
+

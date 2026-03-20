@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package google.api;
+
+import "google/api/annotations.proto";
+
+message Quota {
+  repeated .google.api.QuotaLimit limits = 3;
+  repeated .google.api.MetricRule metric_rules = 4;
+}
+
+message MetricRule {
+  string selector = 1;
+  map<string, int64> metric_costs = 2;
+
+}
+
+message QuotaLimit {
+  string name = 6;
+  string description = 2;
+  int64 default_limit = 3;
+  int64 max_limit = 4;
+  int64 free_tier = 7;
+  string duration = 5;
+  string metric = 8;
+  string unit = 9;
+  map<string, int64> values = 10;
+  string display_name = 12;
+
+}
+

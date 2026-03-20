@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package opentelemetry.proto.collector.trace.v1;
+
+import "opentelemetry/proto/trace/v1/trace.proto";
+
+service TraceService {
+  rpc Export ( .opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest ) returns ( .opentelemetry.proto.collector.trace.v1.ExportTraceServiceResponse );
+}
+
+message ExportTraceServiceRequest {
+  repeated .opentelemetry.proto.trace.v1.ResourceSpans resource_spans = 1;
+}
+
+message ExportTraceServiceResponse {}
+

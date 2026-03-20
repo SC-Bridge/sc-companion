@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.type.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message Percent {
+  double value = 1;
+}
+
+message FractionalPercent {
+  uint32 numerator = 1;
+  .envoy.type.v3.FractionalPercent.DenominatorType denominator = 2;
+
+  enum DenominatorType {
+    HUNDRED = 0;
+    TEN_THOUSAND = 1;
+    MILLION = 2;
+  }
+}
+

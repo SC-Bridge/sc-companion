@@ -27,6 +27,13 @@ go.work.sum
 # env file
 .env
 
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Wails build output
+build/
+
 # Editor/IDE
 # .idea/
 # .vscode/

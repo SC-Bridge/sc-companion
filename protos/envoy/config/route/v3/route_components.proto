@@ -1,0 +1,469 @@
+syntax = "proto3";
+
+package envoy.config.route.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/proxy_protocol.proto";
+import "envoy/type/matcher/v3/metadata.proto";
+import "envoy/type/matcher/v3/regex.proto";
+import "envoy/type/matcher/v3/string.proto";
+import "envoy/type/metadata/v3/metadata.proto";
+import "envoy/type/tracing/v3/custom_tag.proto";
+import "envoy/type/v3/percent.proto";
+import "envoy/type/v3/range.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message VirtualHost {
+  string name = 1;
+  repeated string domains = 2;
+  repeated .envoy.config.route.v3.Route routes = 3;
+  .xds.type.matcher.v3.Matcher matcher = 21;
+  .envoy.config.route.v3.VirtualHost.TlsRequirementType require_tls = 4;
+  repeated .envoy.config.route.v3.VirtualCluster virtual_clusters = 5;
+  repeated .envoy.config.route.v3.RateLimit rate_limits = 6;
+  repeated .envoy.config.core.v3.HeaderValueOption request_headers_to_add = 7;
+  repeated string request_headers_to_remove = 13;
+  repeated .envoy.config.core.v3.HeaderValueOption response_headers_to_add = 10;
+  repeated string response_headers_to_remove = 11;
+  .envoy.config.route.v3.CorsPolicy cors = 8;
+  map<string, .google.protobuf.Any> typed_per_filter_config = 15;
+  bool include_request_attempt_count = 14;
+  bool include_attempt_count_in_response = 19;
+  .envoy.config.route.v3.RetryPolicy retry_policy = 16;
+  .google.protobuf.Any retry_policy_typed_config = 20;
+  .envoy.config.route.v3.HedgePolicy hedge_policy = 17;
+  .google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
+  repeated .envoy.config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 22;
+
+  enum TlsRequirementType {
+    NONE = 0;
+    EXTERNAL_ONLY = 1;
+    ALL = 2;
+  }
+}
+
+message FilterAction {
+  .google.protobuf.Any action = 1;
+}
+
+message Route {
+  string name = 14;
+  .envoy.config.route.v3.RouteMatch match = 1;
+  oneof action {
+    .envoy.config.route.v3.RouteAction route = 2;
+    .envoy.config.route.v3.RedirectAction redirect = 3;
+    .envoy.config.route.v3.DirectResponseAction direct_response = 7;
+    .envoy.config.route.v3.FilterAction filter_action = 17;
+    .envoy.config.route.v3.NonForwardingAction non_forwarding_action = 18;
+  }
+  .envoy.config.core.v3.Metadata metadata = 4;
+  .envoy.config.route.v3.Decorator decorator = 5;
+  map<string, .google.protobuf.Any> typed_per_filter_config = 13;
+  repeated .envoy.config.core.v3.HeaderValueOption request_headers_to_add = 9;
+  repeated string request_headers_to_remove = 12;
+  repeated .envoy.config.core.v3.HeaderValueOption response_headers_to_add = 10;
+  repeated string response_headers_to_remove = 11;
+  .envoy.config.route.v3.Tracing tracing = 15;
+  .google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
+  string stat_prefix = 19;
+
+}
+
+message WeightedCluster {
+  repeated .envoy.config.route.v3.WeightedCluster.ClusterWeight clusters = 1;
+  .google.protobuf.UInt32Value total_weight = 3;
+  string runtime_key_prefix = 2;
+  oneof random_value_specifier {
+    string header_name = 4;
+  }
+
+  message ClusterWeight {
+    string name = 1;
+    string cluster_header = 12;
+    .google.protobuf.UInt32Value weight = 2;
+    .envoy.config.core.v3.Metadata metadata_match = 3;
+    repeated .envoy.config.core.v3.HeaderValueOption request_headers_to_add = 4;
+    repeated string request_headers_to_remove = 9;
+    repeated .envoy.config.core.v3.HeaderValueOption response_headers_to_add = 5;
+    repeated string response_headers_to_remove = 6;
+    map<string, .google.protobuf.Any> typed_per_filter_config = 10;
+    oneof host_rewrite_specifier {
+      string host_rewrite_literal = 11;
+    }
+
+  }
+}
+
+message ClusterSpecifierPlugin {
+  .envoy.config.core.v3.TypedExtensionConfig extension = 1;
+  bool is_optional = 2;
+}
+
+message RouteMatch {
+  oneof path_specifier {
+    string prefix = 1;
+    string path = 2;
+    .envoy.type.matcher.v3.RegexMatcher safe_regex = 10;
+    .envoy.config.route.v3.RouteMatch.ConnectMatcher connect_matcher = 12;
+    string path_separated_prefix = 14;
+    string path_template = 15;
+  }
+  .google.protobuf.BoolValue case_sensitive = 4;
+  .envoy.config.core.v3.RuntimeFractionalPercent runtime_fraction = 9;
+  repeated .envoy.config.route.v3.HeaderMatcher headers = 6;
+  repeated .envoy.config.route.v3.QueryParameterMatcher query_parameters = 7;
+  .envoy.config.route.v3.RouteMatch.GrpcRouteMatchOptions grpc = 8;
+  .envoy.config.route.v3.RouteMatch.TlsContextMatchOptions tls_context = 11;
+  repeated .envoy.type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
+
+  message GrpcRouteMatchOptions {
+  }
+  message TlsContextMatchOptions {
+    .google.protobuf.BoolValue presented = 1;
+    .google.protobuf.BoolValue validated = 2;
+  }
+  message ConnectMatcher {}
+}
+
+message CorsPolicy {
+  repeated .envoy.type.matcher.v3.StringMatcher allow_origin_string_match = 11;
+  string allow_methods = 2;
+  string allow_headers = 3;
+  string expose_headers = 4;
+  string max_age = 5;
+  .google.protobuf.BoolValue allow_credentials = 6;
+  oneof enabled_specifier {
+    .envoy.config.core.v3.RuntimeFractionalPercent filter_enabled = 9;
+  }
+  .envoy.config.core.v3.RuntimeFractionalPercent shadow_enabled = 10;
+}
+
+message RouteAction {
+  oneof cluster_specifier {
+    string cluster = 1;
+    string cluster_header = 2;
+    .envoy.config.route.v3.WeightedCluster weighted_clusters = 3;
+    string cluster_specifier_plugin = 37;
+    .envoy.config.route.v3.ClusterSpecifierPlugin inline_cluster_specifier_plugin = 39;
+  }
+  .envoy.config.route.v3.RouteAction.ClusterNotFoundResponseCode cluster_not_found_response_code = 20;
+  .envoy.config.core.v3.Metadata metadata_match = 4;
+  string prefix_rewrite = 5;
+  .envoy.type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
+  string path_template_rewrite = 41;
+  oneof host_rewrite_specifier {
+    string host_rewrite_literal = 6;
+    .google.protobuf.BoolValue auto_host_rewrite = 7;
+    string host_rewrite_header = 29;
+    .envoy.type.matcher.v3.RegexMatchAndSubstitute host_rewrite_path_regex = 35;
+  }
+  bool append_x_forwarded_host = 38;
+  .google.protobuf.Duration timeout = 8;
+  .google.protobuf.Duration idle_timeout = 24;
+  .envoy.config.core.v3.TypedExtensionConfig early_data_policy = 40;
+  .envoy.config.route.v3.RetryPolicy retry_policy = 9;
+  .google.protobuf.Any retry_policy_typed_config = 33;
+  repeated .envoy.config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 30;
+  .envoy.config.core.v3.RoutingPriority priority = 11;
+  repeated .envoy.config.route.v3.RateLimit rate_limits = 13;
+  .google.protobuf.BoolValue include_vh_rate_limits = 14 [ deprecated = true ];
+  repeated .envoy.config.route.v3.RouteAction.HashPolicy hash_policy = 15;
+  .envoy.config.route.v3.CorsPolicy cors = 17;
+  .google.protobuf.Duration max_grpc_timeout = 23 [ deprecated = true ];
+  .google.protobuf.Duration grpc_timeout_offset = 28 [ deprecated = true ];
+  repeated .envoy.config.route.v3.RouteAction.UpgradeConfig upgrade_configs = 25;
+  .envoy.config.route.v3.InternalRedirectPolicy internal_redirect_policy = 34;
+  .envoy.config.route.v3.RouteAction.InternalRedirectAction internal_redirect_action = 26 [ deprecated = true ];
+  .google.protobuf.UInt32Value max_internal_redirects = 31 [ deprecated = true ];
+  .envoy.config.route.v3.HedgePolicy hedge_policy = 27;
+  .envoy.config.route.v3.RouteAction.MaxStreamDuration max_stream_duration = 36;
+
+  message RequestMirrorPolicy {
+    string cluster = 1;
+    string cluster_header = 5;
+    .envoy.config.core.v3.RuntimeFractionalPercent runtime_fraction = 3;
+    .google.protobuf.BoolValue trace_sampled = 4;
+  }
+
+  message HashPolicy {
+    oneof policy_specifier {
+      .envoy.config.route.v3.RouteAction.HashPolicy.Header header = 1;
+      .envoy.config.route.v3.RouteAction.HashPolicy.Cookie cookie = 2;
+      .envoy.config.route.v3.RouteAction.HashPolicy.ConnectionProperties connection_properties = 3;
+      .envoy.config.route.v3.RouteAction.HashPolicy.QueryParameter query_parameter = 5;
+      .envoy.config.route.v3.RouteAction.HashPolicy.FilterState filter_state = 6;
+    }
+    bool terminal = 4;
+
+    message Header {
+      string header_name = 1;
+      .envoy.type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 2;
+    }
+    message Cookie {
+      string name = 1;
+      .google.protobuf.Duration ttl = 2;
+      string path = 3;
+    }
+    message ConnectionProperties {
+      bool source_ip = 1;
+    }
+    message QueryParameter {
+      string name = 1;
+    }
+    message FilterState {
+      string key = 1;
+    }
+  }
+
+  message UpgradeConfig {
+    string upgrade_type = 1;
+    .google.protobuf.BoolValue enabled = 2;
+    .envoy.config.route.v3.RouteAction.UpgradeConfig.ConnectConfig connect_config = 3;
+
+    message ConnectConfig {
+      .envoy.config.core.v3.ProxyProtocolConfig proxy_protocol_config = 1;
+      bool allow_post = 2;
+    }
+  }
+
+  message MaxStreamDuration {
+    .google.protobuf.Duration max_stream_duration = 1;
+    .google.protobuf.Duration grpc_timeout_header_max = 2;
+    .google.protobuf.Duration grpc_timeout_header_offset = 3;
+  }
+
+  enum ClusterNotFoundResponseCode {
+    SERVICE_UNAVAILABLE = 0;
+    NOT_FOUND = 1;
+    INTERNAL_SERVER_ERROR = 2;
+  }
+
+  enum InternalRedirectAction {
+    PASS_THROUGH_INTERNAL_REDIRECT = 0;
+    HANDLE_INTERNAL_REDIRECT = 1;
+  }
+}
+
+message RetryPolicy {
+  string retry_on = 1;
+  .google.protobuf.UInt32Value num_retries = 2;
+  .google.protobuf.Duration per_try_timeout = 3;
+  .google.protobuf.Duration per_try_idle_timeout = 13;
+  .envoy.config.route.v3.RetryPolicy.RetryPriority retry_priority = 4;
+  repeated .envoy.config.route.v3.RetryPolicy.RetryHostPredicate retry_host_predicate = 5;
+  repeated .envoy.config.core.v3.TypedExtensionConfig retry_options_predicates = 12;
+  int64 host_selection_retry_max_attempts = 6;
+  repeated uint32 retriable_status_codes = 7;
+  .envoy.config.route.v3.RetryPolicy.RetryBackOff retry_back_off = 8;
+  .envoy.config.route.v3.RetryPolicy.RateLimitedRetryBackOff rate_limited_retry_back_off = 11;
+  repeated .envoy.config.route.v3.HeaderMatcher retriable_headers = 9;
+  repeated .envoy.config.route.v3.HeaderMatcher retriable_request_headers = 10;
+
+  message RetryPriority {
+    string name = 1;
+    oneof config_type {
+      .google.protobuf.Any typed_config = 3;
+    }
+  }
+
+  message RetryHostPredicate {
+    string name = 1;
+    oneof config_type {
+      .google.protobuf.Any typed_config = 3;
+    }
+  }
+
+  message RetryBackOff {
+    .google.protobuf.Duration base_interval = 1;
+    .google.protobuf.Duration max_interval = 2;
+  }
+
+  message ResetHeader {
+    string name = 1;
+    .envoy.config.route.v3.RetryPolicy.ResetHeaderFormat format = 2;
+  }
+
+  message RateLimitedRetryBackOff {
+    repeated .envoy.config.route.v3.RetryPolicy.ResetHeader reset_headers = 1;
+    .google.protobuf.Duration max_interval = 2;
+  }
+
+  enum ResetHeaderFormat {
+    SECONDS = 0;
+    UNIX_TIMESTAMP = 1;
+  }
+}
+
+message HedgePolicy {
+  .google.protobuf.UInt32Value initial_requests = 1;
+  .envoy.type.v3.FractionalPercent additional_request_chance = 2;
+  bool hedge_on_per_try_timeout = 3;
+}
+
+message RedirectAction {
+  oneof scheme_rewrite_specifier {
+    bool https_redirect = 4;
+    string scheme_redirect = 7;
+  }
+  string host_redirect = 1;
+  uint32 port_redirect = 8;
+  oneof path_rewrite_specifier {
+    string path_redirect = 2;
+    string prefix_rewrite = 5;
+    .envoy.type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 9;
+  }
+  .envoy.config.route.v3.RedirectAction.RedirectResponseCode response_code = 3;
+  bool strip_query = 6;
+
+  enum RedirectResponseCode {
+    MOVED_PERMANENTLY = 0;
+    FOUND = 1;
+    SEE_OTHER = 2;
+    TEMPORARY_REDIRECT = 3;
+    PERMANENT_REDIRECT = 4;
+  }
+}
+
+message DirectResponseAction {
+  uint32 status = 1;
+  .envoy.config.core.v3.DataSource body = 2;
+}
+
+message NonForwardingAction {}
+
+message Decorator {
+  string operation = 1;
+  .google.protobuf.BoolValue propagate = 2;
+}
+
+message Tracing {
+  .envoy.type.v3.FractionalPercent client_sampling = 1;
+  .envoy.type.v3.FractionalPercent random_sampling = 2;
+  .envoy.type.v3.FractionalPercent overall_sampling = 3;
+  repeated .envoy.type.tracing.v3.CustomTag custom_tags = 4;
+}
+
+message VirtualCluster {
+  repeated .envoy.config.route.v3.HeaderMatcher headers = 4;
+  string name = 2;
+}
+
+message RateLimit {
+  .google.protobuf.UInt32Value stage = 1;
+  string disable_key = 2;
+  repeated .envoy.config.route.v3.RateLimit.Action actions = 3;
+  .envoy.config.route.v3.RateLimit.Override limit = 4;
+
+  message Action {
+    oneof action_specifier {
+      .envoy.config.route.v3.RateLimit.Action.SourceCluster source_cluster = 1;
+      .envoy.config.route.v3.RateLimit.Action.DestinationCluster destination_cluster = 2;
+      .envoy.config.route.v3.RateLimit.Action.RequestHeaders request_headers = 3;
+      .envoy.config.route.v3.RateLimit.Action.RemoteAddress remote_address = 4;
+      .envoy.config.route.v3.RateLimit.Action.GenericKey generic_key = 5;
+      .envoy.config.route.v3.RateLimit.Action.HeaderValueMatch header_value_match = 6;
+      .envoy.config.route.v3.RateLimit.Action.DynamicMetaData dynamic_metadata = 7 [ deprecated = true ];
+      .envoy.config.route.v3.RateLimit.Action.MetaData metadata = 8;
+      .envoy.config.core.v3.TypedExtensionConfig extension = 9;
+      .envoy.config.route.v3.RateLimit.Action.MaskedRemoteAddress masked_remote_address = 10;
+    }
+
+    message SourceCluster {
+    }
+    message DestinationCluster {
+    }
+    message RequestHeaders {
+      string header_name = 1;
+      string descriptor_key = 2;
+      bool skip_if_absent = 3;
+    }
+    message RemoteAddress {
+    }
+    message MaskedRemoteAddress {
+      .google.protobuf.UInt32Value v4_prefix_mask_len = 1;
+      .google.protobuf.UInt32Value v6_prefix_mask_len = 2;
+    }
+    message GenericKey {
+      string descriptor_value = 1;
+      string descriptor_key = 2;
+    }
+    message HeaderValueMatch {
+      string descriptor_key = 4;
+      string descriptor_value = 1;
+      .google.protobuf.BoolValue expect_match = 2;
+      repeated .envoy.config.route.v3.HeaderMatcher headers = 3;
+    }
+    message DynamicMetaData {
+      string descriptor_key = 1;
+      .envoy.type.metadata.v3.MetadataKey metadata_key = 2;
+      string default_value = 3;
+    }
+    message MetaData {
+      string descriptor_key = 1;
+      .envoy.type.metadata.v3.MetadataKey metadata_key = 2;
+      string default_value = 3;
+      .envoy.config.route.v3.RateLimit.Action.MetaData.Source source = 4;
+
+      enum Source {
+        DYNAMIC = 0;
+        ROUTE_ENTRY = 1;
+      }
+    }
+  }
+  message Override {
+    oneof override_specifier {
+      .envoy.config.route.v3.RateLimit.Override.DynamicMetadata dynamic_metadata = 1;
+    }
+
+    message DynamicMetadata {
+      .envoy.type.metadata.v3.MetadataKey metadata_key = 1;
+    }
+  }
+}
+
+message HeaderMatcher {
+  string name = 1;
+  oneof header_match_specifier {
+    string exact_match = 4 [ deprecated = true ];
+    .envoy.type.matcher.v3.RegexMatcher safe_regex_match = 11 [ deprecated = true ];
+    .envoy.type.v3.Int64Range range_match = 6;
+    bool present_match = 7;
+    string prefix_match = 9 [ deprecated = true ];
+    string suffix_match = 10 [ deprecated = true ];
+    string contains_match = 12 [ deprecated = true ];
+    .envoy.type.matcher.v3.StringMatcher string_match = 13;
+  }
+  bool invert_match = 8;
+  bool treat_missing_header_as_empty = 14;
+}
+
+message QueryParameterMatcher {
+  string name = 1;
+  oneof query_parameter_match_specifier {
+    .envoy.type.matcher.v3.StringMatcher string_match = 5;
+    bool present_match = 6;
+  }
+}
+
+message InternalRedirectPolicy {
+  .google.protobuf.UInt32Value max_internal_redirects = 1;
+  repeated uint32 redirect_response_codes = 2;
+  repeated .envoy.config.core.v3.TypedExtensionConfig predicates = 3;
+  bool allow_cross_scheme_redirect = 4;
+}
+
+message FilterConfig {
+  .google.protobuf.Any config = 1;
+  bool is_optional = 2;
+}
+

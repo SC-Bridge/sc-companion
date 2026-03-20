@@ -13,6 +13,7 @@ import (
 
 	"github.com/SC-Bridge/sc-companion/internal/config"
 	"github.com/SC-Bridge/sc-companion/internal/events"
+	"github.com/SC-Bridge/sc-companion/internal/grpcproxy"
 	"github.com/SC-Bridge/sc-companion/internal/logtailer"
 	"github.com/SC-Bridge/sc-companion/internal/store"
 	"github.com/SC-Bridge/sc-companion/internal/sync"
@@ -24,6 +25,8 @@ func main() {
 	configPath := flag.String("config", "config.yaml", "path to config file")
 	replay := flag.Bool("replay", false, "process entire log file from start instead of tailing")
 	dbPath := flag.String("db", "", "path to SQLite database (default: ~/.scbridge/companion.db)")
+	proxyPort := flag.Int("proxy-port", 0, "gRPC proxy port (default: 8443, 0 = use config)")
+	noProxy := flag.Bool("no-proxy", false, "disable gRPC proxy")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -129,6 +132,34 @@ func main() {
 		slog.Info("API sync enabled", "endpoint", cfg.APIEndpoint)
 	} else {
 		slog.Info("API sync disabled — set api_token in config to enable")
+	}
+
+	// Start gRPC proxy (runs in background goroutine)
+	if *noProxy {
+		cfg.ProxyEnabled = false
+	}
+	if *proxyPort > 0 {
+		cfg.ProxyPort = *proxyPort
+	}
+	if cfg.ProxyPort == 0 {
+		cfg.ProxyPort = 8443
+	}
+	if cfg.ProxyEnabled {
+		proxy, err := grpcproxy.NewProxy(grpcproxy.ProxyConfig{
+			ListenAddr: fmt.Sprintf("127.0.0.1:%d", cfg.ProxyPort),
+			CADir:      config.DataDir(),
+		}, bus)
+		if err != nil {
+			slog.Error("failed to create gRPC proxy", "error", err)
+		} else {
+			go func() {
+				if err := proxy.Run(ctx); err != nil {
+					slog.Error("gRPC proxy stopped", "error", err)
+				}
+			}()
+		}
+	} else {
+		slog.Info("gRPC proxy disabled")
 	}
 
 	// Start log tailer

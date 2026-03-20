@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package google.iam.v1;
+
+import "google/api/annotations.proto";
+option csharp_namespace = "Google.Cloud.Iam.V1";
+
+message GetPolicyOptions {
+  int32 requested_policy_version = 1;
+}
+

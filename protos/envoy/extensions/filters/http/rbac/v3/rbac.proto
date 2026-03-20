@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.rbac.v3;
+
+import "envoy/config/rbac/v3/rbac.proto";
+import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+message RBAC {
+  .envoy.config.rbac.v3.RBAC rules = 1;
+  .xds.type.matcher.v3.Matcher matcher = 4;
+  .envoy.config.rbac.v3.RBAC shadow_rules = 2;
+  .xds.type.matcher.v3.Matcher shadow_matcher = 5;
+  string shadow_rules_stat_prefix = 3;
+}
+
+message RBACPerRoute {
+  .envoy.extensions.filters.http.rbac.v3.RBAC rbac = 2;
+}
+

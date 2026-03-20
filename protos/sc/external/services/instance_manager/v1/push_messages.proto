@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package sc.external.services.instance_manager.v1;
+
+message InstanceCreationStarted {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message InstanceCreationCompleted {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message PoolInstanceAssigned {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message InstanceUnstowStarted {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message InstanceUnstowCompleted {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message InstanceStowStarted {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message InstanceStowCompleted {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message InstanceBuryStarted {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message InstanceBuryCompleted {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message PoolInstanceCreationStarted {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message PoolInstanceCreationCompleted {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message InstanceAssignmentChanged {
+  uint64 instance_geid = 1;
+  string new_assignment_urn = 2;
+}
+
+message InstanceCreationFailed {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+  string instance_identifier = 3;
+}
+
+message InstanceBecameActive {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message InstanceBecameIdle {
+  uint64 instance_geid = 1;
+  string shard_id = 2;
+}
+
+message PlayerJoinedInstance {
+  string player_urn = 1;
+  uint64 instance_geid = 2;
+}
+
+message PlayerLeftInstance {
+  uint64 player_geid = 1;
+  uint64 instance_geid = 2;
+}
+
+message PlayerKickedFromInstance {
+  uint64 player_geid = 1;
+  uint64 instance_geid = 2;
+}
+

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package google.api;
+
+message LabelDescriptor {
+  string key = 1;
+  .google.api.LabelDescriptor.ValueType value_type = 2;
+  string description = 3;
+
+  enum ValueType {
+    STRING = 0;
+    BOOL = 1;
+    INT64 = 2;
+  }
+}
+

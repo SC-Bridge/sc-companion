@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package google.api;
+
+import "google/api/annotations.proto";
+
+message Endpoint {
+  string name = 1;
+  repeated string aliases = 2;
+  repeated string features = 4;
+  string target = 101;
+  bool allow_cors = 5;
+}
+

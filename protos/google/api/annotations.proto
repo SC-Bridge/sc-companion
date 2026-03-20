@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package google.api;
+
+import "google/api/http.proto";
+import "google/protobuf/descriptor.proto";
+
+
+// Extensions for .google.protobuf.MethodOptions
+
+extend .google.protobuf.MethodOptions {
+  .google.api.HttpRule http = 72295728;
+}

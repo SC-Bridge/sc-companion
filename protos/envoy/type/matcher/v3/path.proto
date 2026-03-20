@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package envoy.type.matcher.v3;
+
+import "envoy/type/matcher/v3/string.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message PathMatcher {
+  oneof rule {
+    .envoy.type.matcher.v3.StringMatcher path = 1;
+  }
+}
+

@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package google.longrunning;
+
+import "google/api/annotations.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/descriptor.proto";
+import "google/protobuf/empty.proto";
+import "google/rpc/status.proto";
+option csharp_namespace = "Google.LongRunning";
+
+service Operations {
+  rpc ListOperations ( .google.longrunning.ListOperationsRequest ) returns ( .google.longrunning.ListOperationsResponse );
+  rpc GetOperation ( .google.longrunning.GetOperationRequest ) returns ( .google.longrunning.Operation );
+  rpc DeleteOperation ( .google.longrunning.DeleteOperationRequest ) returns ( .google.protobuf.Empty );
+  rpc CancelOperation ( .google.longrunning.CancelOperationRequest ) returns ( .google.protobuf.Empty );
+}
+
+message Operation {
+  string name = 1;
+  .google.protobuf.Any metadata = 2;
+  bool done = 3;
+  oneof result {
+    .google.rpc.Status error = 4;
+    .google.protobuf.Any response = 5;
+  }
+}
+
+message GetOperationRequest {
+  string name = 1;
+}
+
+message ListOperationsRequest {
+  string name = 4;
+  string filter = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListOperationsResponse {
+  repeated .google.longrunning.Operation operations = 1;
+  string next_page_token = 2;
+}
+
+message CancelOperationRequest {
+  string name = 1;
+}
+
+message DeleteOperationRequest {
+  string name = 1;
+}
+
+message OperationInfo {
+  string response_type = 1;
+  string metadata_type = 2;
+}
+
+
+// Extensions for .google.protobuf.MethodOptions
+
+extend .google.protobuf.MethodOptions {
+  .google.longrunning.OperationInfo operation_info = 1049;
+}

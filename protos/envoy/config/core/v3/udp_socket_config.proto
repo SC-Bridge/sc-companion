@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "google/protobuf/wrappers.proto";
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+message UdpSocketConfig {
+  .google.protobuf.UInt64Value max_rx_datagram_size = 1;
+  .google.protobuf.BoolValue prefer_gro = 2;
+}
+

@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package xds.core.v3;
+
+import "xds/annotations/v3/status.proto";
+import "validate/validate.proto";
+
+message Authority {
+  string name = 1;
+}
+

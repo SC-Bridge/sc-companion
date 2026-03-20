@@ -1,0 +1,134 @@
+syntax = "proto3";
+
+package sc.external.services.contacts.v1;
+
+import "google/api/annotations.proto";
+import "sc/external/services/contacts/v1/types.proto";
+import "sc/external/common/shard/v1/types.proto";
+import "sc/external/common/api/v1/pagination.proto";
+
+service ContactsService {
+  rpc ListContacts ( .sc.external.services.contacts.v1.ListContactsRequest ) returns ( .sc.external.services.contacts.v1.ListContactsResponse );
+  rpc SearchAccount ( .sc.external.services.contacts.v1.SearchAccountRequest ) returns ( .sc.external.services.contacts.v1.SearchAccountResponse );
+  rpc RemoveFriend ( .sc.external.services.contacts.v1.RemoveFriendRequest ) returns ( .sc.external.services.contacts.v1.RemoveFriendResponse );
+  rpc GetShardInfo ( .sc.external.services.contacts.v1.GetShardInfoRequest ) returns ( .sc.external.services.contacts.v1.GetShardInfoResponse );
+  rpc SendFriendRequest ( .sc.external.services.contacts.v1.SendFriendRequestRequest ) returns ( .sc.external.services.contacts.v1.SendFriendRequestResponse );
+  rpc CancelFriendRequest ( .sc.external.services.contacts.v1.CancelFriendRequestRequest ) returns ( .sc.external.services.contacts.v1.CancelFriendRequestResponse );
+  rpc ListPendingFriendRequests ( .sc.external.services.contacts.v1.ListPendingFriendRequestsRequest ) returns ( .sc.external.services.contacts.v1.ListPendingFriendRequestsResponse );
+  rpc AcceptFriendRequest ( .sc.external.services.contacts.v1.AcceptFriendRequestRequest ) returns ( .sc.external.services.contacts.v1.AcceptFriendRequestResponse );
+  rpc DeclineFriendRequest ( .sc.external.services.contacts.v1.DeclineFriendRequestRequest ) returns ( .sc.external.services.contacts.v1.DeclineFriendRequestResponse );
+  rpc SetUnilateralRelationship ( .sc.external.services.contacts.v1.SetUnilateralRelationshipRequest ) returns ( .sc.external.services.contacts.v1.SetUnilateralRelationshipResponse );
+  rpc RemoveUnilateralRelationship ( .sc.external.services.contacts.v1.RemoveUnilateralRelationshipRequest ) returns ( .sc.external.services.contacts.v1.RemoveUnilateralRelationshipResponse );
+  rpc SetNote ( .sc.external.services.contacts.v1.SetNoteRequest ) returns ( .sc.external.services.contacts.v1.SetNoteResponse );
+}
+
+message SearchAccountRequest {
+  string search = 1;
+  .sc.external.common.api.v1.PaginationArguments pagination = 2;
+}
+
+message SearchAccountResponse {
+  repeated .sc.external.services.contacts.v1.AccountInfo accounts = 1;
+  .sc.external.common.api.v1.PaginationInfo page_info = 2;
+}
+
+message GetShardInfoRequest {
+  oneof identifier {
+    int32 account_id = 1;
+    uint64 player_id = 2;
+  }
+}
+
+message GetShardInfoResponse {
+  .sc.external.common.shard.v1.ShardInfo shard_info = 1;
+}
+
+message ListContactsRequest {
+  repeated .sc.external.services.contacts.v1.RelationshipType relationship_types = 1;
+  repeated int32 target_account_ids = 3;
+  .sc.external.common.api.v1.PaginationArguments pagination = 2;
+}
+
+message ListContactsResponse {
+  repeated .sc.external.services.contacts.v1.Contact contacts = 1;
+  .sc.external.common.api.v1.PaginationInfo page_info = 2;
+}
+
+message RemoveFriendRequest {
+  uint32 account_id = 1;
+}
+
+message RemoveFriendResponse {}
+
+message SendFriendRequestRequest {
+  oneof identifier {
+    int32 account_id = 1;
+    uint64 player_id = 2;
+  }
+}
+
+message SendFriendRequestResponse {
+  .sc.external.services.contacts.v1.FriendRequest request = 1;
+}
+
+message CancelFriendRequestRequest {
+  string request_id = 1;
+}
+
+message CancelFriendRequestResponse {}
+
+message ListPendingFriendRequestsRequest {
+  .sc.external.common.api.v1.PaginationArguments pagination = 1;
+}
+
+message ListPendingFriendRequestsResponse {
+  repeated .sc.external.services.contacts.v1.FriendRequest pending_friend_requests = 1;
+  .sc.external.common.api.v1.PaginationInfo page_info = 2;
+}
+
+message AcceptFriendRequestRequest {
+  string request_id = 1;
+}
+
+message AcceptFriendRequestResponse {}
+
+message DeclineFriendRequestRequest {
+  string request_id = 1;
+}
+
+message DeclineFriendRequestResponse {}
+
+message SetUnilateralRelationshipRequest {
+  oneof identifier {
+    int32 account_id = 1;
+    uint64 player_id = 2;
+  }
+  .sc.external.services.contacts.v1.RelationshipType relationship_type = 3;
+}
+
+message SetUnilateralRelationshipResponse {
+  int32 target_account_id = 1;
+}
+
+message RemoveUnilateralRelationshipRequest {
+  oneof identifier {
+    int32 account_id = 1;
+    uint64 player_id = 2;
+  }
+  .sc.external.services.contacts.v1.RelationshipType relationship_type = 3;
+}
+
+message RemoveUnilateralRelationshipResponse {
+  int32 target_account_id = 1;
+}
+
+message SetNoteRequest {
+  oneof identifier {
+    int32 account_id = 1;
+    uint64 player_id = 2;
+  }
+  string content = 3;
+}
+
+message SetNoteResponse {}
+

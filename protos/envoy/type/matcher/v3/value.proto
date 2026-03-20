@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package envoy.type.matcher.v3;
+
+import "envoy/type/matcher/v3/number.proto";
+import "envoy/type/matcher/v3/string.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+message ValueMatcher {
+  oneof match_pattern {
+    .envoy.type.matcher.v3.ValueMatcher.NullMatch null_match = 1;
+    .envoy.type.matcher.v3.DoubleMatcher double_match = 2;
+    .envoy.type.matcher.v3.StringMatcher string_match = 3;
+    bool bool_match = 4;
+    bool present_match = 5;
+    .envoy.type.matcher.v3.ListMatcher list_match = 6;
+  }
+
+  message NullMatch {
+  }
+}
+
+message ListMatcher {
+  oneof match_pattern {
+    .envoy.type.matcher.v3.ValueMatcher one_of = 1;
+  }
+}
+

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package xds.core.v3;
+
+import "google/protobuf/any.proto";
+import "xds/annotations/v3/status.proto";
+import "xds/core/v3/resource_locator.proto";
+import "validate/validate.proto";
+
+message CollectionEntry {
+  oneof resource_specifier {
+    .xds.core.v3.ResourceLocator locator = 1;
+    .xds.core.v3.CollectionEntry.InlineEntry inline_entry = 2;
+  }
+
+  message InlineEntry {
+    string name = 1;
+    string version = 2;
+    .google.protobuf.Any resource = 3;
+  }
+}
+

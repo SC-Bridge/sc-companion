@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package google.api;
+
+import "google/api/annotations.proto";
+
+message Authentication {
+  repeated .google.api.AuthenticationRule rules = 3;
+  repeated .google.api.AuthProvider providers = 4;
+}
+
+message AuthenticationRule {
+  string selector = 1;
+  .google.api.OAuthRequirements oauth = 2;
+  bool allow_without_credential = 5;
+  repeated .google.api.AuthRequirement requirements = 7;
+}
+
+message AuthProvider {
+  string id = 1;
+  string issuer = 2;
+  string jwks_uri = 3;
+  string audiences = 4;
+  string authorization_url = 5;
+}
+
+message OAuthRequirements {
+  string canonical_scopes = 1;
+}
+
+message AuthRequirement {
+  string provider_id = 1;
+  string audiences = 2;
+}
+

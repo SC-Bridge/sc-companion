@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package google.type;
+
+import "google/protobuf/duration.proto";
+
+message DateTime {
+  int32 year = 1;
+  int32 month = 2;
+  int32 day = 3;
+  int32 hours = 4;
+  int32 minutes = 5;
+  int32 seconds = 6;
+  int32 nanos = 7;
+  oneof time_offset {
+    .google.protobuf.Duration utc_offset = 8;
+    .google.type.TimeZone time_zone = 9;
+  }
+}
+
+message TimeZone {
+  string id = 1;
+  string version = 2;
+}
+

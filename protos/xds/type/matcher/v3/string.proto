@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package xds.type.matcher.v3;
+
+import "xds/type/matcher/v3/regex.proto";
+import "validate/validate.proto";
+
+message StringMatcher {
+  oneof match_pattern {
+    string exact = 1;
+    string prefix = 2;
+    string suffix = 3;
+    .xds.type.matcher.v3.RegexMatcher safe_regex = 5;
+    string contains = 7;
+  }
+  bool ignore_case = 6;
+}
+
+message ListStringMatcher {
+  repeated .xds.type.matcher.v3.StringMatcher patterns = 1;
+}
+

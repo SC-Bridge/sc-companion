@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package sc.external.services.land_claim.v1;
+
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+import "sc/external/services/land_claim/v1/types.proto";
+
+service LandClaimService {
+  rpc QueryAreaClaims ( .sc.external.services.land_claim.v1.QueryAreaClaimsRequest ) returns ( .sc.external.services.land_claim.v1.QueryAreaClaimsResponse );
+  rpc QueryOwnedClaims ( .sc.external.services.land_claim.v1.QueryOwnedClaimsRequest ) returns ( .sc.external.services.land_claim.v1.QueryOwnedClaimsResponse );
+}
+
+message QueryAreaClaimsRequest {
+  .sc.external.services.land_claim.v1.AreaFilter area_filter = 1;
+}
+
+message QueryAreaClaimsResponse {
+  repeated .sc.external.services.land_claim.v1.LandClaim claims = 1;
+}
+
+message QueryOwnedClaimsRequest {}
+
+message QueryOwnedClaimsResponse {
+  repeated .sc.external.services.land_claim.v1.LandClaim claims = 1;
+}
+

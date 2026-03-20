@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package envoy.type.http.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+message PathTransformation {
+  repeated .envoy.type.http.v3.PathTransformation.Operation operations = 1;
+
+  message Operation {
+    oneof operation_specifier {
+      .envoy.type.http.v3.PathTransformation.Operation.NormalizePathRFC3986 normalize_path_rfc_3986 = 2;
+      .envoy.type.http.v3.PathTransformation.Operation.MergeSlashes merge_slashes = 3;
+    }
+
+    message NormalizePathRFC3986 {}
+    message MergeSlashes {}
+  }
+}
+

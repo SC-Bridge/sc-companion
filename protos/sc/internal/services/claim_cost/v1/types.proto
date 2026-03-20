@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package sc.internal.services.claim_cost.v1;
+
+import "sc/external/services/land_claim/v1/types.proto";
+import "sc/external/services/ledger/v1/types.proto";
+import "google/protobuf/timestamp.proto";
+
+message LandClaimArea {
+  string id = 1;
+  uint32 location_id = 2;
+  string owner_urn = 3;
+  uint64 area = 4;
+  .sc.external.services.land_claim.v1.ClaimType type = 5;
+  .google.protobuf.Timestamp last_paid_at = 6;
+}
+
+message LandClaimRenewalInfo {
+  string land_claim_id = 1;
+  .sc.external.services.ledger.v1.Funds amount = 2;
+  .sc.internal.services.claim_cost.v1.TaxPenaltyStage penality = 3;
+}
+
+enum TaxPenaltyStage {
+  TAX_PENALTY_STAGE_UNSPECIFIED = 0;
+  TAX_PENALTY_STAGE_MISSED_PAYMENT = 1;
+  TAX_PENALTY_STAGE_DECAY = 2;
+  TAX_PENALTY_STAGE_OWNERSHIP_LOSS = 3;
+}
+
