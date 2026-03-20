@@ -23,7 +23,7 @@ type Config struct {
 func Default() *Config {
 	return &Config{
 		APIEndpoint:  "https://scbridge.app/api",
-		ProxyEnabled: true,
+		ProxyEnabled: false,
 		ProxyPort:    8443,
 	}
 }

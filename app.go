@@ -11,6 +11,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/SC-Bridge/sc-companion/internal/cigclient"
 	"github.com/SC-Bridge/sc-companion/internal/config"
 	"github.com/SC-Bridge/sc-companion/internal/events"
 	"github.com/SC-Bridge/sc-companion/internal/grpcproxy"
@@ -30,6 +31,8 @@ type App struct {
 	trayCtrl  *tray.Controller
 	proxy     *grpcproxy.Proxy
 	tailer    *logtailer.Tailer
+	cigClient *cigclient.Client
+	mu        sync.Mutex
 	debugMode bool
 
 	// Recent events buffer for debug view
@@ -47,15 +50,16 @@ type EventEntry struct {
 
 // StatusInfo represents the current app status for the frontend.
 type StatusInfo struct {
-	PlayerHandle string `json:"playerHandle"`
-	CurrentShip  string `json:"currentShip"`
-	Location     string `json:"location"`
-	Jurisdiction string `json:"jurisdiction"`
-	ProxyRunning bool   `json:"proxyRunning"`
-	TailerActive bool   `json:"tailerActive"`
-	EventCount   int    `json:"eventCount"`
-	LastEvent    string `json:"lastEvent"`
-	DebugMode    bool   `json:"debugMode"`
+	PlayerHandle  string `json:"playerHandle"`
+	CurrentShip   string `json:"currentShip"`
+	Location      string `json:"location"`
+	Jurisdiction  string `json:"jurisdiction"`
+	ProxyRunning  bool   `json:"proxyRunning"`
+	TailerActive  bool   `json:"tailerActive"`
+	GameConnected bool   `json:"gameConnected"`
+	EventCount    int    `json:"eventCount"`
+	LastEvent     string `json:"lastEvent"`
+	DebugMode     bool   `json:"debugMode"`
 }
 
 // AppConfig represents the user-facing configuration.
@@ -199,6 +203,55 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}
 
+	// Watch for loginData.json and connect CIG client
+	go func() {
+		loginPath, err := cigclient.FindLoginData()
+		if err != nil {
+			slog.Info("loginData.json not found yet, will watch for it")
+			// Try common base paths for the watcher
+			drives := []string{"C", "D", "E", "F"}
+			for _, d := range drives {
+				base := filepath.Join(d+`:\`, "Roberts Space Industries", "StarCitizen")
+				if _, err := os.Stat(base); err == nil {
+					loginPath = filepath.Join(base, "LIVE", "loginData.json")
+					break
+				}
+			}
+		}
+		if loginPath == "" {
+			slog.Warn("cannot find SC install for loginData.json watcher")
+			return
+		}
+
+		slog.Info("watching for loginData.json", "path", loginPath)
+		cigclient.WatchLoginData(loginPath, func(ld *cigclient.LoginData) {
+			slog.Info("loginData.json detected",
+				"username", ld.Username,
+				"endpoint", ld.StarNetwork.ServicesEndpoint,
+			)
+
+			client, err := cigclient.NewClient(ld)
+			if err != nil {
+				slog.Error("failed to create CIG client", "error", err)
+				return
+			}
+
+			if err := client.Connect(svcCtx); err != nil {
+				slog.Error("failed to connect CIG client", "error", err)
+				return
+			}
+
+			a.mu.Lock()
+			if a.cigClient != nil {
+				a.cigClient.Close()
+			}
+			a.cigClient = client
+			a.mu.Unlock()
+
+			slog.Info("CIG client connected", "username", ld.Username)
+		})
+	}()
+
 	slog.Info("SC Bridge Companion started")
 }
 
@@ -206,6 +259,9 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) shutdown(ctx context.Context) {
 	if a.cancel != nil {
 		a.cancel()
+	}
+	if a.cigClient != nil {
+		a.cigClient.Close()
 	}
 	if a.db != nil {
 		a.db.Close()
@@ -238,6 +294,10 @@ func (a *App) GetStatus() StatusInfo {
 	}
 
 	status.TailerActive = a.tailer != nil
+
+	a.mu.Lock()
+	status.GameConnected = a.cigClient != nil
+	a.mu.Unlock()
 
 	return status
 }
@@ -287,4 +347,33 @@ func (a *App) GetTotalEvents() int {
 	}
 	total, _ := a.db.TotalEvents()
 	return total
+}
+
+// GetWallet returns the player's wallet balances from CIG's API.
+func (a *App) GetWallet() ([]cigclient.WalletBalance, error) {
+	a.mu.Lock()
+	client := a.cigClient
+	a.mu.Unlock()
+	if client == nil {
+		return nil, fmt.Errorf("not connected — launch Star Citizen first")
+	}
+	return client.GetWallet(context.Background())
+}
+
+// GetFriends returns the player's friend list from CIG's API.
+func (a *App) GetFriends() ([]cigclient.Friend, error) {
+	a.mu.Lock()
+	client := a.cigClient
+	a.mu.Unlock()
+	if client == nil {
+		return nil, fmt.Errorf("not connected — launch Star Citizen first")
+	}
+	return client.GetFriends(context.Background())
+}
+
+// IsGameConnected returns whether we have an active CIG API connection.
+func (a *App) IsGameConnected() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cigClient != nil
 }
