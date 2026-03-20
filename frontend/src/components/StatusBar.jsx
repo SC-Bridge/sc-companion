@@ -4,7 +4,7 @@ function StatusBar({ status }) {
   if (!status) return null
 
   return (
-    <div className="flex items-center h-7 px-8 bg-sc-darker/60 border-t border-white/[0.04] text-[11px] font-[family-name:var(--font-mono)] text-gray-500 gap-4 select-none">
+    <div className="app-statusbar font-[family-name:var(--font-mono)]" style={{ display: 'flex', alignItems: 'center', height: 28, borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(9,19,31,0.6)', fontSize: 11, color: '#6b7280', gap: 16, userSelect: 'none' }}>
       {/* Proxy status */}
       <div className="flex items-center gap-1.5">
         {status.proxyRunning ? (

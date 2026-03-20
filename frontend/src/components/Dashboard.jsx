@@ -1,18 +1,32 @@
 import { Radio, FileText, Database, Shield } from 'lucide-react'
 
 const StatCard = ({ icon: Icon, label, value }) => (
-  <div className="bg-white/[0.03] backdrop-blur-md border border-white/[0.06] rounded-xl p-5 hover:border-sc-accent/20 transition-all duration-300">
-    <div className="flex items-center gap-3.5">
-      <div className="w-8 h-8 rounded-lg bg-sc-accent/10 flex items-center justify-center shrink-0">
-        <Icon size={16} className="text-sc-accent" />
+  <div
+    style={{
+      padding: 20,
+      background: 'rgba(255,255,255,0.03)',
+      border: '1px solid rgba(255,255,255,0.06)',
+      borderRadius: 12,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 14,
+      transition: 'border-color 0.3s',
+    }}
+  >
+    <div style={{
+      width: 32, height: 32, borderRadius: 8,
+      background: 'rgba(34,211,238,0.1)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+    }}>
+      <Icon size={16} style={{ color: '#22d3ee' }} />
+    </div>
+    <div style={{ minWidth: 0 }}>
+      <div className="font-[family-name:var(--font-display)]" style={{ fontSize: 11, letterSpacing: '0.05em', color: '#6b7280', textTransform: 'uppercase' }}>
+        {label}
       </div>
-      <div className="min-w-0">
-        <div className="text-[11px] font-[family-name:var(--font-display)] tracking-wider text-gray-500 uppercase">
-          {label}
-        </div>
-        <div className="text-lg font-[family-name:var(--font-mono)] text-white mt-0.5 truncate">
-          {value}
-        </div>
+      <div className="font-[family-name:var(--font-mono)]" style={{ fontSize: 18, color: '#fff', marginTop: 2 }}>
+        {value}
       </div>
     </div>
   </div>
@@ -20,7 +34,7 @@ const StatCard = ({ icon: Icon, label, value }) => (
 
 function Dashboard({ status }) {
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
       {/* Hero */}
       <div className="relative text-center py-8">
         <div className="relative inline-block mb-4">
@@ -73,7 +87,7 @@ function Dashboard({ status }) {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
         <StatCard
           icon={Radio}
           label="gRPC Proxy"
@@ -97,11 +111,11 @@ function Dashboard({ status }) {
       </div>
 
       {/* Connection info card */}
-      <div className="bg-white/[0.03] backdrop-blur-md border border-white/[0.06] rounded-xl p-6">
-        <h3 className="font-[family-name:var(--font-display)] text-sm tracking-wider text-gray-400 uppercase mb-6">
+      <div style={{ padding: 24, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12 }}>
+        <h3 className="font-[family-name:var(--font-display)]" style={{ fontSize: 14, letterSpacing: '0.05em', color: '#9ca3af', textTransform: 'uppercase', marginBottom: 24 }}>
           Data Sources
         </h3>
-        <div className="space-y-5">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <DataSourceRow
             label="Game.log Tailer"
             description="Parses in-game events: ship boarding, contracts, location changes, money transfers"
@@ -125,15 +139,17 @@ function Dashboard({ status }) {
 }
 
 const DataSourceRow = ({ label, description, active, note }) => (
-  <div className="flex items-start gap-4 pl-1">
-    <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-      active ? 'bg-sc-success shadow-[0_0_6px_rgba(46,196,182,0.5)]' : 'bg-gray-600'
-    }`} />
+  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, paddingLeft: 4 }}>
+    <div style={{
+      width: 8, height: 8, borderRadius: '50%', marginTop: 6, flexShrink: 0,
+      background: active ? '#2ec4b6' : '#4b5563',
+      boxShadow: active ? '0 0 6px rgba(46,196,182,0.5)' : 'none',
+    }} />
     <div>
-      <div className="text-sm text-gray-300">{label}</div>
-      <div className="text-xs text-gray-600 mt-0.5">{description}</div>
+      <div style={{ fontSize: 14, color: '#d1d5db' }}>{label}</div>
+      <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2 }}>{description}</div>
       {note && !active && (
-        <div className="text-xs text-sc-warn/60 mt-1">{note}</div>
+        <div style={{ fontSize: 12, color: 'rgba(245,166,35,0.6)', marginTop: 4 }}>{note}</div>
       )}
     </div>
   </div>

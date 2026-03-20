@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import TitleBar from './components/TitleBar'
 import StatusBar from './components/StatusBar'
 import Dashboard from './components/Dashboard'
 import EventFeed from './components/EventFeed'
@@ -71,14 +70,10 @@ function App() {
   const isDev = !wails
   if (isDev) {
     return (
-      <div className="flex flex-col w-full h-full overflow-hidden">
-        <TitleBar isDev />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full border-2 border-sc-accent/30 flex items-center justify-center">
-              <div className="w-12 h-12 rounded-full border-2 border-sc-accent animate-pulse" />
-            </div>
-            <h2 className="font-[family-name:var(--font-display)] text-xl text-white tracking-wider mb-2">
+      <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
+            <h2 className="font-[family-name:var(--font-display)] text-xl text-white tracking-wider" style={{ marginBottom: 8 }}>
               SC BRIDGE COMPANION
             </h2>
             <p className="text-gray-500 text-sm">
@@ -91,51 +86,70 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col w-full h-full overflow-hidden">
-      <TitleBar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Tab nav */}
-        <nav className="flex items-center gap-1 px-8 pt-2 border-b border-white/[0.06]">
-          {[
-            { id: 'dashboard', label: 'Dashboard' },
-            ...(debugMode ? [{ id: 'events', label: 'Event Feed' }] : []),
-            { id: 'settings', label: 'Settings' },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`relative px-5 py-2.5 text-sm font-[family-name:var(--font-display)] tracking-wider uppercase transition-colors ${
-                activeTab === tab.id
-                  ? 'text-sc-accent'
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              {tab.label}
-              {activeTab === tab.id && (
-                <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-sc-accent rounded-full shadow-[0_0_8px_rgba(34,211,238,0.4)]" />
-              )}
-            </button>
-          ))}
-          <div className="flex-1" />
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
+      {/* Tab nav */}
+      <nav className="app-nav" style={{ display: 'flex', alignItems: 'center', gap: 4, paddingTop: 8, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {[
+          { id: 'dashboard', label: 'Dashboard' },
+          ...(debugMode ? [{ id: 'events', label: 'Event Feed' }] : []),
+          { id: 'settings', label: 'Settings' },
+        ].map(tab => (
           <button
-            onClick={toggleDebug}
-            className={`px-3 py-1.5 mr-2 text-xs font-[family-name:var(--font-mono)] rounded transition-colors ${
-              debugMode
-                ? 'bg-sc-accent/10 text-sc-accent border border-sc-accent/20'
-                : 'text-gray-600 hover:text-gray-400 border border-white/[0.06]'
-            }`}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className="font-[family-name:var(--font-display)] tracking-wider uppercase"
+            style={{
+              position: 'relative',
+              padding: '10px 20px',
+              fontSize: 14,
+              color: activeTab === tab.id ? '#22d3ee' : '#6b7280',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'color 0.2s',
+            }}
           >
-            {debugMode ? 'DEBUG ON' : 'DEBUG'}
+            {tab.label}
+            {activeTab === tab.id && (
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 8,
+                right: 8,
+                height: 2,
+                background: '#22d3ee',
+                borderRadius: 1,
+                boxShadow: '0 0 8px rgba(34,211,238,0.4)',
+              }} />
+            )}
           </button>
-        </nav>
+        ))}
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={toggleDebug}
+          className="font-[family-name:var(--font-mono)]"
+          style={{
+            padding: '6px 12px',
+            fontSize: 12,
+            borderRadius: 6,
+            border: debugMode ? '1px solid rgba(34,211,238,0.2)' : '1px solid rgba(255,255,255,0.06)',
+            background: debugMode ? 'rgba(34,211,238,0.1)' : 'transparent',
+            color: debugMode ? '#22d3ee' : '#4b5563',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+        >
+          {debugMode ? 'DEBUG ON' : 'DEBUG'}
+        </button>
+      </nav>
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto px-8 py-6">
-          {activeTab === 'dashboard' && <Dashboard status={status} />}
-          {activeTab === 'events' && <EventFeed events={events} />}
-          {activeTab === 'settings' && <Settings config={config} />}
-        </main>
-      </div>
+      {/* Content */}
+      <main className="app-content" style={{ flex: 1, overflowY: 'auto' }}>
+        {activeTab === 'dashboard' && <Dashboard status={status} />}
+        {activeTab === 'events' && <EventFeed events={events} />}
+        {activeTab === 'settings' && <Settings config={config} />}
+      </main>
+
       <StatusBar status={status} />
     </div>
   )

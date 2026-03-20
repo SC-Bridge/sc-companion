@@ -29,8 +29,34 @@
   right: 0;
   bottom: 0;
   overflow: hidden;
-  padding-left: 24px;
-  padding-right: 24px;
+}
+
+/* Wails webview ignores Tailwind padding utilities — use plain CSS */
+.app-nav {
+  padding-left: 28px;
+  padding-right: 28px;
+}
+
+.app-content {
+  padding: 28px 28px 24px;
+}
+
+.app-statusbar {
+  padding-left: 28px;
+  padding-right: 28px;
+}
+
+.app-titlebar {
+  padding-left: 16px;
+  padding-right: 0;
+}
+
+.dashboard-section-gap {
+  margin-top: 32px;
+}
+
+.data-source-row {
+  padding: 8px 0;
 }
 
 body {
