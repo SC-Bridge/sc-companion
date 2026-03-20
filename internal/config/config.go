@@ -15,6 +15,8 @@ type Config struct {
 	APIToken     string `yaml:"api_token"`
 	ProxyEnabled bool   `yaml:"proxy_enabled"`
 	ProxyPort    int    `yaml:"proxy_port"`
+	ProxyDirect  bool   `yaml:"proxy_direct"`  // direct TLS mode (hosts file redirect)
+	BackendAddr  string `yaml:"backend_addr"`   // real CIG backend IP:port
 }
 
 // Default returns a config with sensible defaults.

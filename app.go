@@ -165,9 +165,15 @@ func (a *App) startup(ctx context.Context) {
 
 	// Start gRPC proxy
 	if cfg.ProxyEnabled {
+		proxyPort := cfg.ProxyPort
+		if cfg.ProxyDirect && proxyPort == 8443 {
+			proxyPort = 443 // direct mode needs port 443
+		}
 		proxy, err := grpcproxy.NewProxy(grpcproxy.ProxyConfig{
-			ListenAddr: fmt.Sprintf("127.0.0.1:%d", cfg.ProxyPort),
-			CADir:      config.DataDir(),
+			ListenAddr:  fmt.Sprintf("127.0.0.1:%d", proxyPort),
+			CADir:       config.DataDir(),
+			DirectMode:  cfg.ProxyDirect,
+			BackendAddr: cfg.BackendAddr,
 		}, a.bus)
 		if err != nil {
 			slog.Error("gRPC proxy failed to start", "error", err)

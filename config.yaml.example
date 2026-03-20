@@ -1,0 +1,19 @@
+# SC Bridge Companion configuration
+# Copy to config.yaml and edit as needed.
+
+# Path to Star Citizen Game.log (auto-detected if empty)
+# log_path: "D:\\Roberts Space Industries\\StarCitizen\\LIVE\\Game.log"
+
+# SC Bridge API sync
+api_endpoint: "https://scbridge.app/api"
+# api_token: "your-api-token-here"
+
+# gRPC proxy settings
+proxy_enabled: true
+proxy_port: 8443
+
+# Direct TLS mode (hosts file redirect approach)
+# Set to true and provide the real CIG backend IP when using hosts file redirect.
+# The proxy will listen on port 443 and forward to the real backend.
+# proxy_direct: true
+# backend_addr: "34.11.124.51:443"

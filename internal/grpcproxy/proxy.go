@@ -18,16 +18,16 @@ import (
 	"github.com/SC-Bridge/sc-companion/internal/grpcproxy/descriptors"
 )
 
-// Proxy is an HTTP CONNECT proxy that intercepts gRPC traffic via TLS MITM.
+// Proxy intercepts gRPC traffic via TLS MITM. Supports two modes:
+//   - HTTP CONNECT mode (proxy env var approach)
+//   - Direct TLS mode (hosts file redirect approach)
 type Proxy struct {
-	listenAddr string
-	bus        *events.Bus
-	certCache  *LeafCertCache
-	handler    *Handler
-
-	// connTargets maps connection local addresses to their intended backend.
-	// Populated before handing the connection to gRPC, read by the handler.
-	connTargets sync.Map // localAddr string → target string
+	listenAddr  string
+	directMode  bool
+	backendAddr string // only used in direct mode
+	bus         *events.Bus
+	certCache   *LeafCertCache
+	handler     *Handler
 
 	mu      sync.RWMutex
 	running bool
@@ -37,6 +37,12 @@ type Proxy struct {
 type ProxyConfig struct {
 	ListenAddr string // e.g. "127.0.0.1:8443"
 	CADir      string // directory containing ca.crt and ca.key
+
+	// Direct TLS mode (hosts file redirect approach):
+	// Instead of HTTP CONNECT, listen as a raw TLS server and forward
+	// all connections to BackendAddr.
+	DirectMode  bool   // if true, use direct TLS instead of HTTP CONNECT
+	BackendAddr string // real backend IP:port, e.g. "34.11.124.51:443"
 }
 
 // NewProxy creates a new HTTP CONNECT proxy with gRPC interception.
@@ -70,16 +76,18 @@ func NewProxy(cfg ProxyConfig, bus *events.Bus) (*Proxy, error) {
 	handler := NewHandler(decoder)
 
 	p := &Proxy{
-		listenAddr: cfg.ListenAddr,
-		bus:        bus,
-		certCache:  certCache,
-		handler:    handler,
+		listenAddr:  cfg.ListenAddr,
+		directMode:  cfg.DirectMode,
+		backendAddr: cfg.BackendAddr,
+		bus:         bus,
+		certCache:   certCache,
+		handler:     handler,
 	}
 
 	return p, nil
 }
 
-// Run starts the HTTP CONNECT proxy. Blocks until ctx is cancelled.
+// Run starts the proxy. Blocks until ctx is cancelled.
 func (p *Proxy) Run(ctx context.Context) error {
 	listener, err := net.Listen("tcp", p.listenAddr)
 	if err != nil {
@@ -91,7 +99,11 @@ func (p *Proxy) Run(ctx context.Context) error {
 	p.running = true
 	p.mu.Unlock()
 
-	slog.Info("gRPC proxy listening", "addr", p.listenAddr)
+	mode := "HTTP CONNECT"
+	if p.directMode {
+		mode = fmt.Sprintf("direct TLS → %s", p.backendAddr)
+	}
+	slog.Info("gRPC proxy listening", "addr", p.listenAddr, "mode", mode)
 
 	go func() {
 		<-ctx.Done()
@@ -108,7 +120,11 @@ func (p *Proxy) Run(ctx context.Context) error {
 			slog.Error("accept error", "error", err)
 			continue
 		}
-		go p.handleConnect(conn)
+		if p.directMode {
+			go p.handleDirect(conn)
+		} else {
+			go p.handleConnect(conn)
+		}
 	}
 }
 
@@ -117,6 +133,41 @@ func (p *Proxy) IsRunning() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.running
+}
+
+// handleDirect handles a connection in direct TLS mode (hosts file redirect).
+// The client connects directly to us thinking we're the CIG server.
+// No HTTP CONNECT — we immediately do TLS and forward to the real backend.
+func (p *Proxy) handleDirect(conn net.Conn) {
+	defer conn.Close()
+
+	slog.Debug("direct connection from", "remote", conn.RemoteAddr())
+
+	// Wrap in TLS — we present a cert for whatever hostname the client expects
+	tlsConfig := &tls.Config{
+		GetCertificate: p.certCache.GetCertificate,
+		NextProtos:     []string{"h2", "http/1.1"},
+	}
+
+	tlsConn := tls.Server(conn, tlsConfig)
+	if err := tlsConn.Handshake(); err != nil {
+		slog.Warn("direct TLS handshake failed", "error", err)
+		return
+	}
+	defer tlsConn.Close()
+
+	slog.Info("direct TLS connection",
+		"sni", tlsConn.ConnectionState().ServerName,
+		"alpn", tlsConn.ConnectionState().NegotiatedProtocol,
+	)
+
+	negotiatedProto := tlsConn.ConnectionState().NegotiatedProtocol
+
+	if negotiatedProto == "h2" {
+		p.serveGRPC(tlsConn, p.backendAddr)
+	} else {
+		p.passthrough(tlsConn, p.backendAddr)
+	}
 }
 
 // handleConnect processes an HTTP CONNECT request.
