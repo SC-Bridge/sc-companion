@@ -23,8 +23,8 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title:     "SC Bridge Companion",
-		Width:     1280,
-		Height:    800,
+		Width:     1400,
+		Height:    950,
 		MinWidth:  900,
 		MinHeight: 600,
 		BackgroundColour: &options.RGBA{
