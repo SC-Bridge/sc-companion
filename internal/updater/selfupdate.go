@@ -78,9 +78,14 @@ func ApplyUpdate(downloadURL string, quitFn func()) error {
 
 	slog.Info("self-update: downloaded", "path", newExePath)
 
-	// Use PowerShell to wait, replace, and relaunch — completely hidden
+	// Use PowerShell to wait, replace, relaunch, and refresh icon cache — completely hidden
 	psScript := fmt.Sprintf(
-		`Start-Sleep -Seconds 2; Copy-Item -Force '%s' '%s'; Remove-Item -Force '%s'; Start-Process '%s'`,
+		`Start-Sleep -Seconds 2; `+
+			`Copy-Item -Force '%s' '%s'; `+
+			`Remove-Item -Force '%s'; `+
+			// Refresh icon cache without killing Explorer
+			`ie4uinit.exe -show; `+
+			`Start-Process '%s'`,
 		newExePath, currentExe, newExePath, currentExe,
 	)
 
