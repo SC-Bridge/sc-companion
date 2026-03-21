@@ -344,7 +344,9 @@ func (c *Client) GetFriends(ctx context.Context) ([]Friend, error) {
 
 // GetReputation returns the player's reputation scores across all factions.
 func (c *Client) GetReputation(ctx context.Context) ([]ReputationScore, error) {
-	resp, err := c.call(ctx, "/sc.external.services.reputation.v1.ReputationService/QueryReputations", nil)
+	resp, err := c.call(ctx, "/sc.external.services.reputation.v1.ReputationService/QueryReputations", func(req *dynamicpb.Message) {
+		setQueryPagination(req, "query", 200)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -472,9 +474,36 @@ func (c *Client) GetReputationHistory(ctx context.Context, reputationIDs []strin
 	return entries, nil
 }
 
+// setQueryPagination sets query.pagination.first on a request message that has a "query" field.
+func setQueryPagination(req *dynamicpb.Message, fieldName string, pageSize uint32) {
+	queryField := req.Descriptor().Fields().ByName(protoreflect.Name(fieldName))
+	if queryField == nil {
+		slog.Warn("no query field on request", "field", fieldName)
+		return
+	}
+	queryMsg := dynamicpb.NewMessage(queryField.Message())
+
+	paginationField := queryMsg.Descriptor().Fields().ByName("pagination")
+	if paginationField == nil {
+		slog.Warn("no pagination field on query")
+		return
+	}
+	paginationMsg := dynamicpb.NewMessage(paginationField.Message())
+
+	firstField := paginationMsg.Descriptor().Fields().ByName("first")
+	if firstField != nil {
+		paginationMsg.Set(firstField, protoreflect.ValueOfUint32(pageSize))
+	}
+
+	queryMsg.Set(paginationField, protoreflect.ValueOfMessage(paginationMsg))
+	req.Set(queryField, protoreflect.ValueOfMessage(queryMsg))
+}
+
 // GetBlueprints returns the player's blueprint collection.
 func (c *Client) GetBlueprints(ctx context.Context) ([]Blueprint, error) {
-	resp, err := c.call(ctx, "/sc.external.services.blueprint_library.v1.BlueprintLibraryService/QueryBlueprintEntries", nil)
+	resp, err := c.call(ctx, "/sc.external.services.blueprint_library.v1.BlueprintLibraryService/QueryBlueprintEntries", func(req *dynamicpb.Message) {
+		setQueryPagination(req, "query", 500)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -529,7 +558,9 @@ func (c *Client) GetBlueprints(ctx context.Context) ([]Blueprint, error) {
 
 // GetEntitlements returns the player's entitlements (ships, items).
 func (c *Client) GetEntitlements(ctx context.Context) ([]Entitlement, error) {
-	resp, err := c.call(ctx, "/sc.external.services.entitlement.v1.ExternalEntitlementService/Query", nil)
+	resp, err := c.call(ctx, "/sc.external.services.entitlement.v1.ExternalEntitlementService/Query", func(req *dynamicpb.Message) {
+		setQueryPagination(req, "query", 500)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -774,7 +805,9 @@ func (c *Client) GetActiveMissions(ctx context.Context) ([]Mission, error) {
 
 // GetStats returns the player's stats.
 func (c *Client) GetStats(ctx context.Context) ([]PlayerStat, error) {
-	resp, err := c.call(ctx, "/sc.external.services.stats.v1.StatsService/FindStats", nil)
+	resp, err := c.call(ctx, "/sc.external.services.stats.v1.StatsService/FindStats", func(req *dynamicpb.Message) {
+		setQueryPagination(req, "query", 500)
+	})
 	if err != nil {
 		return nil, err
 	}
