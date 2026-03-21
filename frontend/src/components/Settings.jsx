@@ -3,7 +3,7 @@ import { Settings as SettingsIcon, FolderOpen, Globe, Link, Unlink, RotateCcw, C
 
 const wails = window.go?.main?.App
 
-function Settings({ config, onConfigChange }) {
+function Settings({ config, onConfigChange, onUpdateFound }) {
   const [categories, setCategories] = useState([])
   const [syncPrefs, setSyncPrefs] = useState({})
   const [expandedCategories, setExpandedCategories] = useState({})
@@ -30,11 +30,14 @@ function Settings({ config, onConfigChange }) {
     try {
       const info = await wails.CheckForUpdate()
       setUpdateResult(info)
+      if (info?.hasUpdate && onUpdateFound) {
+        onUpdateFound(info)
+      }
     } catch (e) {
       setUpdateResult({ error: e.message || 'Check failed' })
     }
     setCheckingUpdate(false)
-  }, [])
+  }, [onUpdateFound])
 
   const handleConnect = useCallback(async () => {
     if (!wails) return
@@ -267,7 +270,7 @@ function Settings({ config, onConfigChange }) {
               {updateResult.error
                 ? <span style={{ color: '#ef4444' }}>{updateResult.error}</span>
                 : updateResult.hasUpdate
-                  ? <span style={{ color: '#22d3ee' }}>v{updateResult.version} available — update from the banner above</span>
+                  ? <span style={{ color: '#22d3ee' }}>v{updateResult.version} available — use the update banner to install</span>
                   : <span style={{ color: '#6b7280' }}>You're on the latest version</span>
               }
             </div>

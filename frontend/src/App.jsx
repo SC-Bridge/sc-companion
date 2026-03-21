@@ -191,7 +191,7 @@ function App() {
         {activeTab === 'dashboard' && <Dashboard status={status} config={config} />}
         {activeTab === 'events' && <EventFeed events={events} />}
         {activeTab === 'friends' && <Friends config={config} />}
-        {activeTab === 'settings' && <Settings config={config} onConfigChange={setConfig} />}
+        {activeTab === 'settings' && <Settings config={config} onConfigChange={setConfig} onUpdateFound={setUpdateInfo} />}
       </main>
 
       <StatusBar status={status} />
