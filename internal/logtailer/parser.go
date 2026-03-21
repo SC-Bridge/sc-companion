@@ -230,25 +230,25 @@ func NewParser() *Parser {
 				return events.Event{Type: "incapacitated", Source: "log", Data: map[string]string{}}
 			},
 		},
-		// Insurance claim
+		// Insurance claim — strip account URN, keep only request ID
 		{
 			name: "insurance_claim",
-			re:   regexp.MustCompile(`<CWallet::ProcessClaimToNextStep> New Insurance Claim Request - entitlementURN: ([^,]+), requestId\s*:\s*(\d+)`),
+			re:   regexp.MustCompile(`<CWallet::ProcessClaimToNextStep> New Insurance Claim Request.*requestId\s*:\s*(\d+)`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "insurance_claim", Source: "log",
-					Data: map[string]string{"urn": m[1], "request_id": m[2]},
+					Data: map[string]string{"request_id": m[1]},
 				}
 			},
 		},
-		// Insurance claim complete
+		// Insurance claim complete — strip account URN, keep result
 		{
 			name: "insurance_claim_complete",
-			re:   regexp.MustCompile(`<CWallet::RmMulticastOnProcessClaimCallback> Claim Complete - entitlementURN: ([^,]+), result:\s*(\d+)`),
+			re:   regexp.MustCompile(`<CWallet::RmMulticastOnProcessClaimCallback> Claim Complete.*result:\s*(\d+)`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "insurance_claim_complete", Source: "log",
-					Data: map[string]string{"urn": m[1], "result": m[2]},
+					Data: map[string]string{"result": m[1]},
 				}
 			},
 		},
@@ -304,14 +304,14 @@ func NewParser() *Parser {
 				}
 			},
 		},
-		// Server join
+		// Server join — capture shard only, not IP address
 		{
 			name: "server_joined",
-			re:   regexp.MustCompile(`Join PU - address\[([^\]]+)\].*shard\[([^\]]+)\]`),
+			re:   regexp.MustCompile(`Join PU.*shard\[([^\]]+)\]`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "server_joined", Source: "log",
-					Data: map[string]string{"address": m[1], "shard": m[2]},
+					Data: map[string]string{"shard": m[1]},
 				}
 			},
 		},
@@ -323,6 +323,153 @@ func NewParser() *Parser {
 				return events.Event{
 					Type: "rewards_earned", Source: "log",
 					Data: map[string]string{"count": m[1]},
+				}
+			},
+		},
+
+		// --- New patterns: mission lifecycle ---
+
+		// Mission ended (push message from server)
+		{
+			name: "mission_ended",
+			re:   regexp.MustCompile(`<MissionEnded> Received MissionEnded push message for: mission_id (\S+) - mission_state (\S+)`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "mission_ended", Source: "log",
+					Data: map[string]string{"mission_id": m[1], "state": m[2]},
+				}
+			},
+		},
+		// End mission (local processing)
+		{
+			name: "end_mission",
+			re:   regexp.MustCompile(`<EndMission> Ending mission.*MissionId\[([^\]]+)\].*Player\[([^\]]+)\].*CompletionType\[([^\]]+)\].*Reason\[([^\]]+)\]`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "end_mission", Source: "log",
+					Data: map[string]string{
+						"mission_id":      m[1],
+						"player":          m[2],
+						"completion_type": m[3],
+						"reason":          m[4],
+					},
+				}
+			},
+		},
+		// New mission objective
+		{
+			name: "new_objective",
+			re:   regexp.MustCompile(`Added notification "New Objective:\s*(.+?):\s*"`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "new_objective", Source: "log",
+					Data: map[string]string{"name": strings.TrimSpace(m[1])},
+				}
+			},
+		},
+		// Contract available (offered to player)
+		{
+			name: "contract_available",
+			re:   regexp.MustCompile(`Added notification "Contract Available:\s*(.+?):\s*"`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "contract_available", Source: "log",
+					Data: map[string]string{"name": strings.TrimSpace(m[1])},
+				}
+			},
+		},
+
+		// --- New patterns: ship/vehicle ---
+
+		// Hangar request completed
+		{
+			name: "hangar_ready",
+			re:   regexp.MustCompile(`Added notification "Hangar Request Completed`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "hangar_ready", Source: "log", Data: map[string]string{}}
+			},
+		},
+		// Ship list fetched from ASOP — count of insured entitlements
+		{
+			name: "ship_list_fetched",
+			re:   regexp.MustCompile(`<CEntityComponentShipListProvider::FetchShipData::<lambda_1>.*Received (\d+) player insured entitlements.*player (\d+)`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "ship_list_fetched", Source: "log",
+					Data: map[string]string{"count": m[1]},
+				}
+			},
+		},
+		// Ship spawned — vehicle list complete
+		{
+			name: "ships_loaded",
+			re:   regexp.MustCompile(`<CEntityComponentShipListProvider::FetchOwnedShipsData.*Fetching vehicle list.*completed\. Retrieved (\d+) vehicles`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "ships_loaded", Source: "log",
+					Data: map[string]string{"count": m[1]},
+				}
+			},
+		},
+
+		// --- New patterns: quantum travel ---
+
+		// QT destination selected
+		{
+			name: "qt_destination_selected",
+			re:   regexp.MustCompile(`<Player Selected Quantum Target - Local>.*destination (\S+)`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "qt_destination_selected", Source: "log",
+					Data: map[string]string{"destination": m[1]},
+				}
+			},
+		},
+		// QT fuel requested
+		{
+			name: "qt_fuel_requested",
+			re:   regexp.MustCompile(`<Player Requested Fuel to Quantum Target - Local>.*destination (\S+)`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "qt_fuel_requested", Source: "log",
+					Data: map[string]string{"destination": m[1]},
+				}
+			},
+		},
+		// QT arrived (more specific version)
+		{
+			name: "qt_arrived_final",
+			re:   regexp.MustCompile(`<Quantum Drive Arrived - Arrived at Final Destination>`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "qt_arrived", Source: "log", Data: map[string]string{}}
+			},
+		},
+
+		// --- New patterns: economy/services ---
+
+		// Emergency services
+		{
+			name: "emergency_services",
+			re:   regexp.MustCompile(`Added notification "Standby, Local Emergency Services`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "emergency_services", Source: "log", Data: map[string]string{}}
+			},
+		},
+
+		// --- New patterns: account reconciliation ---
+
+		// Entitlement reconciliation (login) — capture count only, not account URN
+		{
+			name: "entitlement_reconciliation",
+			re:   regexp.MustCompile(`<ReconcileAccountUpdateNotification>.*details ([^-]+).*status (\S+) - phase (\S+)`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "entitlement_reconciliation", Source: "log",
+					Data: map[string]string{
+						"details": strings.TrimSpace(m[1]),
+						"status":  m[2],
+						"phase":   m[3],
+					},
 				}
 			},
 		},

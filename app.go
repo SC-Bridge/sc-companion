@@ -207,7 +207,6 @@ func (a *App) startup(ctx context.Context) {
 		cigclient.WatchLoginDataMulti(watchPaths, func(ld *cigclient.LoginData, path string) {
 			slog.Info("loginData.json detected",
 				"path", path,
-				"username", ld.Username,
 				"endpoint", ld.StarNetwork.ServicesEndpoint,
 			)
 
@@ -229,14 +228,14 @@ func (a *App) startup(ctx context.Context) {
 			a.cigClient = client
 			a.mu.Unlock()
 
-			slog.Info("CIG client connected", "username", ld.Username)
+			slog.Info("CIG client connected")
 
 			// Emit connection event to bus for debug view
 			a.bus.Publish(events.Event{
 				Type:      "cig_connected",
 				Source:    "grpc",
 				Timestamp: time.Now(),
-				Data:      map[string]string{"username": ld.Username},
+				Data:      map[string]string{},
 			})
 
 			// Start gRPC data sync manager (handles wallet, friends, rep, etc.)

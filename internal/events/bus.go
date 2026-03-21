@@ -13,6 +13,36 @@ type Event struct {
 	Data      map[string]string // key-value pairs specific to the event type
 }
 
+// SyncWorthyTypes are events worth syncing to the SC Bridge API.
+// Everything else is local-only (companion event feed / debug).
+var SyncWorthyTypes = map[string]bool{
+	// Session
+	"player_login":  true,
+	"server_joined": true,
+	// Ship activity
+	"ship_boarded":   true,
+	"ship_exited":    true,
+	"insurance_claim": true,
+	"insurance_claim_complete": true,
+	// Mission lifecycle
+	"contract_accepted":  true,
+	"contract_completed": true,
+	"contract_failed":    true,
+	"mission_ended":      true,
+	// Location (heartbeat enrichment)
+	"location_change":       true,
+	"jurisdiction_entered":  true,
+	// Economy
+	"money_sent":           true,
+	"fined":                true,
+	"transaction_complete": true,
+}
+
+// IsSyncWorthy returns true if this event type should be synced to the API.
+func (e Event) IsSyncWorthy() bool {
+	return SyncWorthyTypes[e.Type]
+}
+
 // Handler processes events from the bus.
 type Handler func(Event)
 
