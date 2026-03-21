@@ -167,18 +167,25 @@ func (c *Client) Connect(ctx context.Context) error {
 
 	slog.Info("connecting to CIG endpoint", "target", target)
 
-	cc, err := grpc.NewClient(
+	// Use DialContext with explicit timeout to ensure connection actually establishes
+	dialCtx, dialCancel := context.WithTimeout(ctx, 15*time.Second)
+	defer dialCancel()
+
+	//nolint:staticcheck // DialContext is deprecated but NewClient doesn't enforce timeouts
+	cc, err := grpc.DialContext(dialCtx,
 		target,
 		grpc.WithTransportCredentials(credentials.NewTLS(nil)),
+		grpc.WithBlock(),
 	)
 	if err != nil {
 		return fmt.Errorf("dial CIG: %w", err)
 	}
 	c.conn = cc
+	slog.Info("gRPC connection established")
 
 	// Get the proper JWT via GetCurrentPlayer (with timeout)
-	jwtCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
+	jwtCtx, jwtCancel := context.WithTimeout(ctx, 15*time.Second)
+	defer jwtCancel()
 
 	slog.Info("requesting JWT from IdentityService...")
 	jwt, err := c.getJWT(jwtCtx)
