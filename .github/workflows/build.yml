@@ -40,11 +40,11 @@ jobs:
       - name: Build Windows executable
         run: wails build -platform windows/amd64 -ldflags "-X main.Version=${{ steps.version.outputs.VERSION }}"
 
-      # Portable zip
-      - name: Create portable zip
+      # Rename portable exe
+      - name: Prepare portable exe
         shell: pwsh
         run: |
-          Compress-Archive -Path "build\bin\SCBridgeCompanion.exe" -DestinationPath "SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-windows-portable.zip"
+          Copy-Item "build\bin\SCBridgeCompanion.exe" "SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-portable.exe"
 
       # MSI installer via WiX v4
       - name: Install WiX Toolset
@@ -61,7 +61,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-windows-portable.zip
+            SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-portable.exe
             SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-setup.msi
           generate_release_notes: true
           draft: false

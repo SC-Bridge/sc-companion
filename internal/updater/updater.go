@@ -74,7 +74,7 @@ func CheckForUpdate(currentVersion string) (*ReleaseInfo, error) {
 	// Find release assets
 	var downloadURL, installerURL string
 	for _, asset := range release.Assets {
-		if strings.HasSuffix(asset.Name, "-portable.zip") {
+		if strings.HasSuffix(asset.Name, "-portable.exe") {
 			downloadURL = asset.BrowserDownloadURL
 		}
 		if strings.HasSuffix(asset.Name, "-setup.msi") {
