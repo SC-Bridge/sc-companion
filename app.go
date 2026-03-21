@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -443,4 +444,124 @@ func (a *App) IsGameConnected() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.cigClient != nil
+}
+
+// TestAllGrpc fetches all gRPC data types and publishes results to the event bus.
+// Called from the frontend debug UI to verify the CIG API is working.
+func (a *App) TestAllGrpc() string {
+	a.mu.Lock()
+	client := a.cigClient
+	a.mu.Unlock()
+	if client == nil {
+		return "not connected"
+	}
+
+	ctx := context.Background()
+	var results []string
+
+	// Wallet
+	if wallets, err := client.GetWallet(ctx); err != nil {
+		a.emitGrpcEvent("wallet_error", map[string]string{"error": err.Error()})
+		results = append(results, "wallet: ERROR "+err.Error())
+	} else {
+		data := map[string]string{"count": fmt.Sprintf("%d", len(wallets))}
+		for _, w := range wallets {
+			data[w.Currency] = fmt.Sprintf("%d", w.Amount)
+		}
+		a.emitGrpcEvent("wallet_data", data)
+		results = append(results, fmt.Sprintf("wallet: %d ledgers", len(wallets)))
+	}
+
+	// Friends
+	if friends, err := client.GetFriends(ctx); err != nil {
+		a.emitGrpcEvent("friends_error", map[string]string{"error": err.Error()})
+		results = append(results, "friends: ERROR "+err.Error())
+	} else {
+		online := 0
+		for _, f := range friends {
+			if f.Status == "online" {
+				online++
+			}
+		}
+		a.emitGrpcEvent("friends_data", map[string]string{
+			"total":  fmt.Sprintf("%d", len(friends)),
+			"online": fmt.Sprintf("%d", online),
+		})
+		results = append(results, fmt.Sprintf("friends: %d total, %d online", len(friends), online))
+	}
+
+	// Reputation
+	if scores, err := client.GetReputation(ctx); err != nil {
+		a.emitGrpcEvent("reputation_error", map[string]string{"error": err.Error()})
+		results = append(results, "reputation: ERROR "+err.Error())
+	} else {
+		a.emitGrpcEvent("reputation_data", map[string]string{
+			"factions": fmt.Sprintf("%d", len(scores)),
+		})
+		results = append(results, fmt.Sprintf("reputation: %d factions", len(scores)))
+	}
+
+	// Blueprints
+	if bps, err := client.GetBlueprints(ctx); err != nil {
+		a.emitGrpcEvent("blueprints_error", map[string]string{"error": err.Error()})
+		results = append(results, "blueprints: ERROR "+err.Error())
+	} else {
+		a.emitGrpcEvent("blueprints_data", map[string]string{
+			"count": fmt.Sprintf("%d", len(bps)),
+		})
+		results = append(results, fmt.Sprintf("blueprints: %d", len(bps)))
+	}
+
+	// Entitlements
+	if ents, err := client.GetEntitlements(ctx); err != nil {
+		a.emitGrpcEvent("entitlements_error", map[string]string{"error": err.Error()})
+		results = append(results, "entitlements: ERROR "+err.Error())
+	} else {
+		ships := 0
+		for _, e := range ents {
+			if e.ItemType == "SHIP" {
+				ships++
+			}
+		}
+		a.emitGrpcEvent("entitlements_data", map[string]string{
+			"total": fmt.Sprintf("%d", len(ents)),
+			"ships": fmt.Sprintf("%d", ships),
+		})
+		results = append(results, fmt.Sprintf("entitlements: %d total, %d ships", len(ents), ships))
+	}
+
+	// Missions
+	if missions, err := client.GetActiveMissions(ctx); err != nil {
+		a.emitGrpcEvent("missions_error", map[string]string{"error": err.Error()})
+		results = append(results, "missions: ERROR "+err.Error())
+	} else {
+		a.emitGrpcEvent("missions_data", map[string]string{
+			"count": fmt.Sprintf("%d", len(missions)),
+		})
+		results = append(results, fmt.Sprintf("missions: %d active", len(missions)))
+	}
+
+	// Stats
+	if stats, err := client.GetStats(ctx); err != nil {
+		a.emitGrpcEvent("stats_error", map[string]string{"error": err.Error()})
+		results = append(results, "stats: ERROR "+err.Error())
+	} else {
+		a.emitGrpcEvent("stats_data", map[string]string{
+			"count": fmt.Sprintf("%d", len(stats)),
+		})
+		results = append(results, fmt.Sprintf("stats: %d", len(stats)))
+	}
+
+	summary := strings.Join(results, " | ")
+	slog.Info("TestAllGrpc complete", "summary", summary)
+	return summary
+}
+
+func (a *App) emitGrpcEvent(eventType string, data map[string]string) {
+	a.bus.Publish(events.Event{
+		Type:      eventType,
+		Source:    "grpc",
+		Timestamp: time.Now(),
+		Data:      data,
+	})
 }

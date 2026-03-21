@@ -19,6 +19,20 @@ const TYPE_COLORS = {
   'cig_connected': 'text-emerald-400',
   'grpc_sync_ok': 'text-cyan-400',
   'grpc_sync_error': 'text-red-400',
+  'wallet_data': 'text-yellow-400',
+  'wallet_error': 'text-red-400',
+  'friends_data': 'text-blue-400',
+  'friends_error': 'text-red-400',
+  'reputation_data': 'text-purple-400',
+  'reputation_error': 'text-red-400',
+  'blueprints_data': 'text-teal-400',
+  'blueprints_error': 'text-red-400',
+  'entitlements_data': 'text-indigo-400',
+  'entitlements_error': 'text-red-400',
+  'missions_data': 'text-orange-400',
+  'missions_error': 'text-red-400',
+  'stats_data': 'text-lime-400',
+  'stats_error': 'text-red-400',
 }
 
 function EventFeed({ events }) {
