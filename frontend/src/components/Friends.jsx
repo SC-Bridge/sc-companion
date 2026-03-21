@@ -21,24 +21,19 @@ function Friends({ config }) {
   const [loading, setLoading] = useState(true)
   const lastPollRef = useRef(null)
 
-  // Initial full load
+  // Initial full load via Go backend
   useEffect(() => {
-    if (!config?.connected) {
+    if (!wails || !config?.connected) {
       setLoading(false)
       return
     }
 
-    const endpoint = config.apiEndpoint || 'https://scbridge.app/api'
-
     async function loadFriends() {
       try {
-        const res = await fetch(`${endpoint}/companion/friends`, { credentials: 'include' })
-        if (res.ok) {
-          const data = await res.json()
-          if (data.ok) {
-            setFriends(data.friends || [])
-            lastPollRef.current = new Date().toISOString()
-          }
+        const result = await wails.GetFriends()
+        if (result) {
+          setFriends(result)
+          lastPollRef.current = new Date().toISOString()
         }
       } catch (e) {
         console.error('Friends load failed:', e)
@@ -47,39 +42,33 @@ function Friends({ config }) {
     }
 
     loadFriends()
-  }, [config?.connected, config?.apiEndpoint])
+  }, [config?.connected])
 
-  // Delta polling every 30s
+  // Delta polling every 30s via Go backend
   useEffect(() => {
-    if (!config?.connected) return
-
-    const endpoint = config.apiEndpoint || 'https://scbridge.app/api'
+    if (!wails || !config?.connected) return
 
     const interval = setInterval(async () => {
       if (!lastPollRef.current) return
       try {
-        const since = encodeURIComponent(lastPollRef.current)
-        const res = await fetch(`${endpoint}/companion/friends?since=${since}`, { credentials: 'include' })
-        if (res.ok) {
-          const data = await res.json()
-          if (data.ok && data.friends?.length > 0) {
-            setFriends(prev => {
-              const updated = new Map(prev.map(f => [f.account_id, f]))
-              for (const f of data.friends) {
-                updated.set(f.account_id, f)
-              }
-              return Array.from(updated.values())
-            })
-          }
-          lastPollRef.current = new Date().toISOString()
+        const delta = await wails.GetFriendsDelta(lastPollRef.current)
+        if (delta && delta.length > 0) {
+          setFriends(prev => {
+            const updated = new Map(prev.map(f => [f.account_id, f]))
+            for (const f of delta) {
+              updated.set(f.account_id, f)
+            }
+            return Array.from(updated.values())
+          })
         }
+        lastPollRef.current = new Date().toISOString()
       } catch (e) {
         console.error('Friends delta poll failed:', e)
       }
     }, 30000)
 
     return () => clearInterval(interval)
-  }, [config?.connected, config?.apiEndpoint])
+  }, [config?.connected])
 
   // Sort: online first, then away, then offline. Alpha within each group.
   const sorted = [...friends].sort((a, b) => {

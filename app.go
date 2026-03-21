@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -365,6 +367,73 @@ func (a *App) ResetSyncPreferences() map[string]bool {
 		slog.Error("failed to save sync preferences", "error", err)
 	}
 	return a.syncPrefs.SyncEnabled
+}
+
+// --- Friends list ---
+
+// FriendEntry represents a friend from SC Bridge.
+type FriendEntry struct {
+	AccountID      string `json:"account_id"`
+	Nickname       string `json:"nickname"`
+	DisplayName    string `json:"display_name"`
+	Presence       string `json:"presence"`
+	ActivityState  string `json:"activity_state"`
+	ActivityDetail string `json:"activity_detail"`
+	UpdatedAt      string `json:"updated_at"`
+}
+
+type friendsResponse struct {
+	OK      bool          `json:"ok"`
+	Friends []FriendEntry `json:"friends"`
+}
+
+// GetFriends fetches the full friends list from SC Bridge.
+func (a *App) GetFriends() []FriendEntry {
+	return a.fetchFriends("")
+}
+
+// GetFriendsDelta fetches only friends updated since the given ISO timestamp.
+func (a *App) GetFriendsDelta(since string) []FriendEntry {
+	return a.fetchFriends(since)
+}
+
+func (a *App) fetchFriends(since string) []FriendEntry {
+	if a.authInfo == nil || a.authInfo.SessionToken == "" {
+		return nil
+	}
+
+	endpoint := config.EndpointForEnv(a.cfg.Environment)
+	url := endpoint + "/companion/friends"
+	if since != "" {
+		url += "?since=" + since
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		slog.Error("friends request failed", "error", err)
+		return nil
+	}
+	req.Header.Set("Authorization", "Bearer "+a.authInfo.SessionToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		slog.Error("friends fetch failed", "error", err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		slog.Warn("friends fetch non-200", "status", resp.StatusCode)
+		return nil
+	}
+
+	var result friendsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		slog.Error("friends decode failed", "error", err)
+		return nil
+	}
+
+	return result.Friends
 }
 
 // --- OAuth connection ---
