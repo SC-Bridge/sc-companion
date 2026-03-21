@@ -132,39 +132,10 @@ function App() {
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
       {/* Update banner */}
       {updateInfo?.hasUpdate && (
-        <div className="app-nav" style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          paddingTop: 6, paddingBottom: 6,
-          background: 'rgba(34,211,238,0.06)',
-          borderBottom: '1px solid rgba(34,211,238,0.12)',
-          fontSize: 12,
-        }}>
-          <Download size={13} style={{ color: '#22d3ee' }} />
-          <span className="text-gray-300">
-            v{updateInfo.version} available
-          </span>
-          <button
-            onClick={() => {
-              if (updateInfo.downloadUrl) wails?.OpenDownloadURL(updateInfo.downloadUrl)
-              else if (updateInfo.url) wails?.OpenDownloadURL(updateInfo.url)
-            }}
-            className="font-[family-name:var(--font-mono)] cursor-pointer"
-            style={{
-              padding: '2px 8px', fontSize: 11, borderRadius: 4,
-              background: 'rgba(34,211,238,0.15)', border: '1px solid rgba(34,211,238,0.2)',
-              color: '#22d3ee', cursor: 'pointer',
-            }}
-          >
-            Download
-          </button>
-          <button
-            onClick={() => setUpdateInfo(null)}
-            className="cursor-pointer"
-            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14 }}
-          >
-            ×
-          </button>
-        </div>
+        <UpdateBanner
+          info={updateInfo}
+          onDismiss={() => setUpdateInfo(null)}
+        />
       )}
 
       {/* Tab nav */}
@@ -231,6 +202,70 @@ function App() {
           onSelect={handleEnvChange}
           onClose={() => setShowEnvSwitcher(false)}
         />
+      )}
+    </div>
+  )
+}
+
+function UpdateBanner({ info, onDismiss }) {
+  const [updating, setUpdating] = useState(false)
+  const [error, setError] = useState(null)
+
+  const handleUpdate = useCallback(async () => {
+    if (!wails || !info.downloadUrl) return
+    setUpdating(true)
+    setError(null)
+    try {
+      const err = await wails.ApplyUpdate(info.downloadUrl)
+      if (err) {
+        setError(err)
+        setUpdating(false)
+      }
+      // If no error, the app is quitting — don't update state
+    } catch (e) {
+      setError(e.message || 'Update failed')
+      setUpdating(false)
+    }
+  }, [info])
+
+  return (
+    <div className="app-nav" style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      paddingTop: 6, paddingBottom: 6,
+      background: error ? 'rgba(239,68,68,0.06)' : 'rgba(34,211,238,0.06)',
+      borderBottom: `1px solid ${error ? 'rgba(239,68,68,0.12)' : 'rgba(34,211,238,0.12)'}`,
+      fontSize: 12,
+    }}>
+      <Download size={13} style={{ color: error ? '#ef4444' : '#22d3ee' }} />
+      <span className="text-gray-300">
+        {updating ? 'Updating...' : error ? error : `v${info.version} available`}
+      </span>
+      {!updating && !error && (
+        <button
+          onClick={handleUpdate}
+          className="font-[family-name:var(--font-mono)] cursor-pointer"
+          style={{
+            padding: '2px 8px', fontSize: 11, borderRadius: 4,
+            background: 'rgba(34,211,238,0.15)', border: '1px solid rgba(34,211,238,0.2)',
+            color: '#22d3ee', cursor: 'pointer',
+          }}
+        >
+          Update & Restart
+        </button>
+      )}
+      {!updating && (
+        <button
+          onClick={onDismiss}
+          className="cursor-pointer"
+          style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14 }}
+        >
+          ×
+        </button>
+      )}
+      {updating && (
+        <span className="text-gray-500 font-[family-name:var(--font-mono)]" style={{ marginLeft: 'auto', fontSize: 11 }}>
+          Downloading...
+        </span>
       )}
     </div>
   )

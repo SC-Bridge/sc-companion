@@ -543,3 +543,15 @@ func (a *App) CheckForUpdate() *updater.ReleaseInfo {
 func (a *App) OpenDownloadURL(url string) {
 	runtime.BrowserOpenURL(a.ctx, url)
 }
+
+// ApplyUpdate downloads the new version, replaces the exe, and restarts.
+func (a *App) ApplyUpdate(downloadURL string) string {
+	err := updater.ApplyUpdate(downloadURL, func() {
+		runtime.Quit(a.ctx)
+	})
+	if err != nil {
+		slog.Error("self-update failed", "error", err)
+		return err.Error()
+	}
+	return ""
+}

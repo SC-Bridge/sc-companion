@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Settings as SettingsIcon, FolderOpen, Globe, Link, Unlink, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react'
+import { Settings as SettingsIcon, FolderOpen, Globe, Link, Unlink, RotateCcw, ChevronDown, ChevronRight, RefreshCw, Download } from 'lucide-react'
 
 const wails = window.go?.main?.App
 
@@ -8,12 +8,29 @@ function Settings({ config, onConfigChange }) {
   const [syncPrefs, setSyncPrefs] = useState({})
   const [expandedCategories, setExpandedCategories] = useState({})
   const [connecting, setConnecting] = useState(false)
+  const [version, setVersion] = useState('')
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [updateResult, setUpdateResult] = useState(null)
 
-  // Load event categories and sync preferences
+  // Load event categories, sync preferences, and version
   useEffect(() => {
     if (!wails) return
     wails.GetEventCategories().then(setCategories).catch(console.error)
     wails.GetSyncPreferences().then(setSyncPrefs).catch(console.error)
+    wails.GetVersion().then(setVersion).catch(console.error)
+  }, [])
+
+  const checkForUpdate = useCallback(async () => {
+    if (!wails) return
+    setCheckingUpdate(true)
+    setUpdateResult(null)
+    try {
+      const info = await wails.CheckForUpdate()
+      setUpdateResult(info)
+    } catch (e) {
+      setUpdateResult({ error: e.message || 'Check failed' })
+    }
+    setCheckingUpdate(false)
   }, [])
 
   const handleConnect = useCallback(async () => {
@@ -203,6 +220,54 @@ function Settings({ config, onConfigChange }) {
           value={config.logPath || 'Auto-detect'}
           description="Path to Star Citizen Game.log file."
         />
+      </SettingsSection>
+
+      {/* Section 4: About */}
+      <SettingsSection title="About">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white/[0.03] flex items-center justify-center">
+                <Download size={14} className="text-sc-accent2" />
+              </div>
+              <div>
+                <div className="text-sm text-gray-300">SC Bridge Companion</div>
+                <div className="text-xs text-gray-600 font-[family-name:var(--font-mono)]">
+                  v{version || '...'}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={checkForUpdate}
+              disabled={checkingUpdate}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer"
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                color: checkingUpdate ? '#4b5563' : '#9ca3af',
+                cursor: checkingUpdate ? 'wait' : 'pointer',
+              }}
+            >
+              <RefreshCw size={12} className={checkingUpdate ? 'animate-spin' : ''} />
+              {checkingUpdate ? 'Checking...' : 'Check for Updates'}
+            </button>
+          </div>
+          {updateResult && (
+            <div className="mt-3 text-xs font-[family-name:var(--font-mono)]" style={{
+              padding: '6px 10px',
+              borderRadius: 6,
+              background: updateResult.hasUpdate ? 'rgba(34,211,238,0.06)' : 'rgba(255,255,255,0.02)',
+              border: updateResult.hasUpdate ? '1px solid rgba(34,211,238,0.12)' : '1px solid rgba(255,255,255,0.04)',
+            }}>
+              {updateResult.error
+                ? <span className="text-red-400">{updateResult.error}</span>
+                : updateResult.hasUpdate
+                  ? <span className="text-sc-accent">v{updateResult.version} available — update from the banner above</span>
+                  : <span className="text-gray-500">You're on the latest version</span>
+              }
+            </div>
+          )}
+        </div>
       </SettingsSection>
     </div>
   )
