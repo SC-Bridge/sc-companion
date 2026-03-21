@@ -1,24 +1,32 @@
-import { Wifi, WifiOff, Radio, User, Ship, MapPin } from 'lucide-react'
+import { Wifi, WifiOff, Zap, ZapOff, RefreshCw, User, Ship, MapPin } from 'lucide-react'
 
 function StatusBar({ status }) {
   if (!status) return null
 
   return (
     <div className="app-statusbar font-[family-name:var(--font-mono)]" style={{ display: 'flex', alignItems: 'center', height: 28, borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(9,19,31,0.6)', fontSize: 11, color: '#6b7280', gap: 16, userSelect: 'none' }}>
-      {/* Proxy status */}
+      {/* CIG API status */}
       <div className="flex items-center gap-1.5">
-        {status.proxyRunning ? (
+        {status.gameConnected ? (
           <>
-            <Radio size={11} className="text-sc-accent" />
-            <span className="text-sc-accent/80">Proxy</span>
+            <Zap size={11} className="text-sc-accent" />
+            <span className="text-sc-accent/80">CIG</span>
           </>
         ) : (
           <>
-            <WifiOff size={11} />
-            <span>Proxy Off</span>
+            <ZapOff size={11} />
+            <span>No CIG</span>
           </>
         )}
       </div>
+
+      {/* Sync status */}
+      {status.syncActive && (
+        <div className="flex items-center gap-1.5">
+          <RefreshCw size={11} className="text-sc-success" />
+          <span className="text-sc-success/80">Syncing</span>
+        </div>
+      )}
 
       {/* Log tailer */}
       <div className="flex items-center gap-1.5">
