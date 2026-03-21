@@ -42,6 +42,9 @@ type App struct {
 	// Sync preferences
 	syncPrefs *config.SyncPreferences
 
+	// Event log file (JSONL for WingmanAI)
+	eventLog *os.File
+
 	// Recent events buffer
 	eventsMu     sync.Mutex
 	recentEvents []EventEntry
@@ -127,6 +130,16 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.db = db
 
+	// Event log file (JSONL — one JSON object per line, for WingmanAI)
+	eventLogPath := filepath.Join(dataDir, "events.log")
+	eventLog, err := os.OpenFile(eventLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		slog.Error("failed to open event log", "path", eventLogPath, "error", err)
+	} else {
+		a.eventLog = eventLog
+		slog.Info("event log opened", "path", eventLogPath)
+	}
+
 	// Event bus
 	a.bus = events.NewBus()
 
@@ -155,10 +168,24 @@ func (a *App) startup(ctx context.Context) {
 			return
 		}
 
-		// Persist
+		// Persist to SQLite
 		if a.db != nil {
 			if _, err := a.db.InsertEvent(merged); err != nil {
 				slog.Error("store event failed", "type", merged.Type, "error", err)
+			}
+		}
+
+		// Write to JSONL event log
+		if a.eventLog != nil {
+			logEntry := map[string]interface{}{
+				"type":      merged.Type,
+				"source":    merged.Source,
+				"timestamp": merged.Timestamp.Format(time.RFC3339Nano),
+				"data":      merged.Data,
+			}
+			if line, err := json.Marshal(logEntry); err == nil {
+				line = append(line, '\n')
+				a.eventLog.Write(line)
 			}
 		}
 
@@ -240,6 +267,9 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.cancel != nil {
 		a.cancel()
 	}
+	if a.eventLog != nil {
+		a.eventLog.Close()
+	}
 	if a.db != nil {
 		a.db.Close()
 	}
@@ -318,6 +348,11 @@ func (a *App) GetTotalEvents() int {
 	}
 	total, _ := a.db.TotalEvents()
 	return total
+}
+
+// GetEventLogPath returns the path to the JSONL event log file.
+func (a *App) GetEventLogPath() string {
+	return filepath.Join(config.DataDir(), "events.log")
 }
 
 // --- Environment switcher ---
