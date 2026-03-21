@@ -3,6 +3,7 @@ import StatusBar from './components/StatusBar'
 import Dashboard from './components/Dashboard'
 import EventFeed from './components/EventFeed'
 import Settings from './components/Settings'
+import EnvironmentSwitcher from './components/EnvironmentSwitcher'
 
 // Wails runtime bindings
 const wails = window.go?.main?.App
@@ -12,7 +13,7 @@ function App() {
   const [config, setConfig] = useState(null)
   const [events, setEvents] = useState([])
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [debugMode, setDebugMode] = useState(false)
+  const [showEnvSwitcher, setShowEnvSwitcher] = useState(false)
 
   // Poll status every 2 seconds
   useEffect(() => {
@@ -21,7 +22,6 @@ function App() {
       try {
         const s = await wails.GetStatus()
         setStatus(s)
-        setDebugMode(s.debugMode)
       } catch (e) {
         console.error('GetStatus failed:', e)
       }
@@ -37,7 +37,7 @@ function App() {
     wails.GetConfig().then(setConfig).catch(console.error)
   }, [])
 
-  // Listen for live events (debug mode)
+  // Listen for live events — always active (no debug gate)
   useEffect(() => {
     if (!window.runtime) return
     const cancel = window.runtime.EventsOn('event', (entry) => {
@@ -49,22 +49,41 @@ function App() {
     return () => { if (cancel) cancel() }
   }, [])
 
-  // Load buffered events when switching to debug
+  // Load buffered events on mount
   useEffect(() => {
-    if (debugMode && wails) {
-      wails.GetRecentEvents().then(setEvents).catch(console.error)
-    }
-  }, [debugMode])
-
-  const toggleDebug = useCallback(async () => {
     if (!wails) return
-    const next = !debugMode
-    await wails.SetDebugMode(next)
-    setDebugMode(next)
-    if (next) {
-      setActiveTab('events')
+    wails.GetRecentEvents().then(setEvents).catch(console.error)
+  }, [])
+
+  // Listen for auth expiry
+  useEffect(() => {
+    if (!window.runtime) return
+    const cancel = window.runtime.EventsOn('auth_expired', () => {
+      // Refresh config to update connection state
+      if (wails) wails.GetConfig().then(setConfig).catch(console.error)
+    })
+    return () => { if (cancel) cancel() }
+  }, [])
+
+  // Ctrl+Shift+D toggles environment switcher
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault()
+        setShowEnvSwitcher(prev => !prev)
+      }
     }
-  }, [debugMode])
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  const handleEnvChange = useCallback(async (env) => {
+    if (!wails) return
+    await wails.SetEnvironment(env)
+    const cfg = await wails.GetConfig()
+    setConfig(cfg)
+    setShowEnvSwitcher(false)
+  }, [])
 
   // Dev mode fallback when not running in Wails
   const isDev = !wails
@@ -91,7 +110,7 @@ function App() {
       <nav className="app-nav" style={{ display: 'flex', alignItems: 'center', gap: 4, paddingTop: 8, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         {[
           { id: 'dashboard', label: 'Dashboard' },
-          ...(debugMode ? [{ id: 'events', label: 'Event Feed' }] : []),
+          { id: 'events', label: 'Event Feed' },
           { id: 'settings', label: 'Settings' },
         ].map(tab => (
           <button
@@ -124,33 +143,24 @@ function App() {
             )}
           </button>
         ))}
-        <div style={{ flex: 1 }} />
-        <button
-          onClick={toggleDebug}
-          className="font-[family-name:var(--font-mono)]"
-          style={{
-            padding: '6px 12px',
-            fontSize: 12,
-            borderRadius: 6,
-            border: debugMode ? '1px solid rgba(34,211,238,0.2)' : '1px solid rgba(255,255,255,0.06)',
-            background: debugMode ? 'rgba(34,211,238,0.1)' : 'transparent',
-            color: debugMode ? '#22d3ee' : '#4b5563',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-        >
-          {debugMode ? 'DEBUG ON' : 'DEBUG'}
-        </button>
       </nav>
 
       {/* Content */}
       <main className="app-content" style={{ flex: 1, overflowY: 'auto' }}>
         {activeTab === 'dashboard' && <Dashboard status={status} />}
         {activeTab === 'events' && <EventFeed events={events} />}
-        {activeTab === 'settings' && <Settings config={config} />}
+        {activeTab === 'settings' && <Settings config={config} onConfigChange={setConfig} />}
       </main>
 
       <StatusBar status={status} />
+
+      {showEnvSwitcher && (
+        <EnvironmentSwitcher
+          current={config?.environment || 'production'}
+          onSelect={handleEnvChange}
+          onClose={() => setShowEnvSwitcher(false)}
+        />
+      )}
     </div>
   )
 }

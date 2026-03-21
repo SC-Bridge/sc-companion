@@ -10,6 +10,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/SC-Bridge/sc-companion/internal/auth"
 	"github.com/SC-Bridge/sc-companion/internal/config"
 	"github.com/SC-Bridge/sc-companion/internal/events"
 	"github.com/SC-Bridge/sc-companion/internal/logtailer"
@@ -23,14 +24,22 @@ type App struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
 	cfg      *config.Config
+	cfgPath  string
 	bus      *events.Bus
 	db       *store.Store
 	trayCtrl *tray.Controller
 	tailer   *logtailer.Tailer
 	mu       sync.Mutex
-	debugMode bool
 
-	// Recent events buffer for debug view
+	// Auth
+	authInfo   *auth.AuthInfo
+	syncClient *storesync.Client
+	syncCancel context.CancelFunc
+
+	// Sync preferences
+	syncPrefs *config.SyncPreferences
+
+	// Recent events buffer
 	eventsMu     sync.Mutex
 	recentEvents []EventEntry
 }
@@ -52,15 +61,26 @@ type StatusInfo struct {
 	TailerActive bool   `json:"tailerActive"`
 	EventCount   int    `json:"eventCount"`
 	LastEvent    string `json:"lastEvent"`
-	DebugMode    bool   `json:"debugMode"`
+	Connected    bool   `json:"connected"`
+	Handle       string `json:"handle"`
+	Environment  string `json:"environment"`
 }
 
 // AppConfig represents the user-facing configuration.
 type AppConfig struct {
 	LogPath     string `json:"logPath"`
 	APIEndpoint string `json:"apiEndpoint"`
-	APIToken    string `json:"apiToken"`
-	DebugMode   bool   `json:"debugMode"`
+	Environment string `json:"environment"`
+	Connected   bool   `json:"connected"`
+	Handle      string `json:"handle"`
+}
+
+// ConnectionStatus represents the auth connection state for the frontend.
+type ConnectionStatus struct {
+	Connected   bool   `json:"connected"`
+	Handle      string `json:"handle"`
+	Endpoint    string `json:"endpoint"`
+	ConnectedAt string `json:"connectedAt"`
 }
 
 const maxRecentEvents = 200
@@ -77,11 +97,18 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
 	// Load config
-	cfg, err := config.Load("config.yaml")
+	a.cfgPath = "config.yaml"
+	cfg, err := config.Load(a.cfgPath)
 	if err != nil {
 		cfg = config.Default()
 	}
 	a.cfg = cfg
+
+	// Load sync preferences
+	a.syncPrefs = config.LoadSyncPreferences()
+
+	// Load auth
+	a.authInfo = auth.Load()
 
 	// Open database
 	dataDir := config.DataDir()
@@ -108,7 +135,7 @@ func (a *App) startup(ctx context.Context) {
 	// Tray controller
 	a.trayCtrl = tray.NewController(a.bus, a.db, svcCancel)
 
-	// Event subscriber — persist + buffer for debug
+	// Event subscriber — persist + buffer + always emit to frontend
 	a.bus.Subscribe(func(evt events.Event) {
 		// Coalesce multi-line money events
 		merged, emit := coalesce.Process(evt)
@@ -129,7 +156,7 @@ func (a *App) startup(ctx context.Context) {
 			}
 		}
 
-		// Buffer for debug view
+		// Buffer for event feed
 		entry := EventEntry{
 			Type:      merged.Type,
 			Source:    merged.Source,
@@ -143,19 +170,24 @@ func (a *App) startup(ctx context.Context) {
 		a.recentEvents = append(a.recentEvents, entry)
 		a.eventsMu.Unlock()
 
-		// Emit to frontend if debug mode
-		if a.debugMode {
-			runtime.EventsEmit(a.ctx, "event", entry)
-		}
+		// Always emit to frontend
+		runtime.EventsEmit(a.ctx, "event", entry)
 
 		slog.Debug("event", "type", merged.Type, "data", merged.Data)
 	})
 
-	// Start API sync (event sync to scbridge.app)
-	if cfg.APIToken != "" {
-		syncClient := storesync.NewClient(cfg.APIEndpoint, cfg.APIToken, db)
-		go syncClient.Run(svcCtx)
-		slog.Info("API sync enabled")
+	// Start API sync if authenticated
+	a.startSync(svcCtx)
+
+	// Legacy API token fallback
+	if a.syncClient == nil && cfg.APIToken != "" {
+		slog.Warn("using legacy api_token from config.yaml — please use Connect to SC Bridge instead")
+		endpoint := config.EndpointForEnv(cfg.Environment)
+		client := storesync.NewClientWithAPIKey(endpoint, cfg.APIToken, db)
+		client.SetSyncCheck(a.syncPrefs.IsEnabled)
+		a.syncClient = client
+		go client.Run(svcCtx)
+		slog.Info("API sync enabled (legacy token)")
 	}
 
 	// Start log tailer
@@ -177,6 +209,26 @@ func (a *App) startup(ctx context.Context) {
 	slog.Info("SC Bridge Companion started")
 }
 
+// startSync starts the sync client if auth is available.
+func (a *App) startSync(ctx context.Context) {
+	if a.authInfo == nil || a.authInfo.SessionToken == "" || a.db == nil {
+		return
+	}
+
+	endpoint := config.EndpointForEnv(a.cfg.Environment)
+	client := storesync.NewClient(endpoint, a.authInfo.SessionToken, a.db)
+	client.SetSyncCheck(a.syncPrefs.IsEnabled)
+	client.SetOnAuthExpired(func() {
+		runtime.EventsEmit(a.ctx, "auth_expired", nil)
+	})
+
+	syncCtx, syncCancel := context.WithCancel(ctx)
+	a.syncClient = client
+	a.syncCancel = syncCancel
+	go client.Run(syncCtx)
+	slog.Info("API sync enabled (bearer token)")
+}
+
 // shutdown is called when the app is closing.
 func (a *App) shutdown(ctx context.Context) {
 	if a.cancel != nil {
@@ -193,7 +245,12 @@ func (a *App) shutdown(ctx context.Context) {
 // GetStatus returns the current application status.
 func (a *App) GetStatus() StatusInfo {
 	status := StatusInfo{
-		DebugMode: a.debugMode,
+		Environment: a.cfg.Environment,
+		Connected:   a.authInfo != nil,
+	}
+
+	if a.authInfo != nil {
+		status.Handle = a.authInfo.Handle
 	}
 
 	if a.trayCtrl != nil {
@@ -218,20 +275,19 @@ func (a *App) GetConfig() AppConfig {
 	if a.cfg == nil {
 		return AppConfig{}
 	}
-	return AppConfig{
+	cfg := AppConfig{
 		LogPath:     a.cfg.LogPath,
-		APIEndpoint: a.cfg.APIEndpoint,
-		APIToken:    a.cfg.APIToken,
-		DebugMode:   a.debugMode,
+		APIEndpoint: config.EndpointForEnv(a.cfg.Environment),
+		Environment: a.cfg.Environment,
+		Connected:   a.authInfo != nil,
 	}
+	if a.authInfo != nil {
+		cfg.Handle = a.authInfo.Handle
+	}
+	return cfg
 }
 
-// SetDebugMode toggles debug mode (shows live event feed).
-func (a *App) SetDebugMode(enabled bool) {
-	a.debugMode = enabled
-}
-
-// GetRecentEvents returns buffered events for the debug view.
+// GetRecentEvents returns buffered events for the event feed.
 func (a *App) GetRecentEvents() []EventEntry {
 	a.eventsMu.Lock()
 	defer a.eventsMu.Unlock()
@@ -256,4 +312,139 @@ func (a *App) GetTotalEvents() int {
 	}
 	total, _ := a.db.TotalEvents()
 	return total
+}
+
+// --- Environment switcher ---
+
+// GetEnvironment returns the current environment.
+func (a *App) GetEnvironment() string {
+	return a.cfg.Environment
+}
+
+// SetEnvironment changes the environment and persists to config.
+func (a *App) SetEnvironment(env string) error {
+	if env != "production" && env != "staging" {
+		return nil
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.cfg.Environment = env
+	if err := a.cfg.Save(a.cfgPath); err != nil {
+		slog.Error("failed to save config", "error", err)
+		return err
+	}
+	slog.Info("environment changed", "env", env)
+	return nil
+}
+
+// --- Sync preferences ---
+
+// GetEventCategories returns all event types grouped by category.
+func (a *App) GetEventCategories() []events.EventCategory {
+	return events.EventCategories()
+}
+
+// GetSyncPreferences returns the current sync preferences.
+func (a *App) GetSyncPreferences() map[string]bool {
+	return a.syncPrefs.SyncEnabled
+}
+
+// SetSyncPreference updates a single event type's sync preference.
+func (a *App) SetSyncPreference(eventType string, enabled bool) {
+	a.syncPrefs.SyncEnabled[eventType] = enabled
+	if err := a.syncPrefs.Save(); err != nil {
+		slog.Error("failed to save sync preferences", "error", err)
+	}
+}
+
+// ResetSyncPreferences resets all sync preferences to defaults.
+func (a *App) ResetSyncPreferences() map[string]bool {
+	a.syncPrefs = config.DefaultSyncPreferences()
+	if err := a.syncPrefs.Save(); err != nil {
+		slog.Error("failed to save sync preferences", "error", err)
+	}
+	return a.syncPrefs.SyncEnabled
+}
+
+// --- OAuth connection ---
+
+// ConnectToSCBridge starts the OAuth flow to connect to SC Bridge.
+func (a *App) ConnectToSCBridge() ConnectionStatus {
+	endpoint := config.EndpointForEnv(a.cfg.Environment)
+
+	flow, err := auth.NewOAuthFlow(endpoint)
+	if err != nil {
+		slog.Error("oauth flow setup failed", "error", err)
+		return ConnectionStatus{}
+	}
+
+	// Open browser
+	connectURL := flow.ConnectURL()
+	runtime.BrowserOpenURL(a.ctx, connectURL)
+
+	// Wait for callback (blocks up to 5 min)
+	result := flow.Start(a.ctx)
+	if result.Error != nil {
+		slog.Error("oauth flow failed", "error", result.Error)
+		return ConnectionStatus{}
+	}
+
+	// Save auth info (handle will be populated on first sync/heartbeat)
+	info := auth.NewAuthInfo(result.Token, "", endpoint)
+	if err := auth.Save(info); err != nil {
+		slog.Error("failed to save auth", "error", err)
+		return ConnectionStatus{}
+	}
+
+	a.mu.Lock()
+	a.authInfo = info
+	a.mu.Unlock()
+
+	// Start sync with new token
+	if a.syncCancel != nil {
+		a.syncCancel()
+	}
+	svcCtx, svcCancel := context.WithCancel(context.Background())
+	a.cancel = svcCancel
+	a.startSync(svcCtx)
+
+	slog.Info("connected to SC Bridge")
+	return ConnectionStatus{
+		Connected:   true,
+		Handle:      info.Handle,
+		Endpoint:    info.Endpoint,
+		ConnectedAt: info.ConnectedAt,
+	}
+}
+
+// DisconnectFromSCBridge clears the auth and stops sync.
+func (a *App) DisconnectFromSCBridge() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.syncCancel != nil {
+		a.syncCancel()
+		a.syncCancel = nil
+	}
+	a.syncClient = nil
+	a.authInfo = nil
+
+	if err := auth.Clear(); err != nil {
+		slog.Error("failed to clear auth", "error", err)
+	}
+	slog.Info("disconnected from SC Bridge")
+}
+
+// GetConnectionStatus returns the current connection state.
+func (a *App) GetConnectionStatus() ConnectionStatus {
+	if a.authInfo == nil {
+		return ConnectionStatus{}
+	}
+	return ConnectionStatus{
+		Connected:   true,
+		Handle:      a.authInfo.Handle,
+		Endpoint:    a.authInfo.Endpoint,
+		ConnectedAt: a.authInfo.ConnectedAt,
+	}
 }

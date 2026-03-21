@@ -16,23 +16,51 @@ import (
 // Client syncs local events to the SC Bridge API.
 type Client struct {
 	endpoint   string
-	apiToken   string
+	authHeader string // "Bearer <token>" or legacy API token
+	authValue  string
 	httpClient *http.Client
 	store      *store.Store
 	batchSize  int
+	syncCheck  func(string) bool // optional: returns true if event type should sync
+	onAuthExpired func()         // optional: called on 401 response
 }
 
-// NewClient creates a sync client.
-func NewClient(endpoint, apiToken string, s *store.Store) *Client {
+// NewClient creates a sync client using Bearer token auth.
+func NewClient(endpoint, sessionToken string, s *store.Store) *Client {
 	return &Client{
-		endpoint: endpoint,
-		apiToken: apiToken,
+		endpoint:   endpoint,
+		authHeader: "Authorization",
+		authValue:  "Bearer " + sessionToken,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 		store:     s,
 		batchSize: 100,
 	}
+}
+
+// NewClientWithAPIKey creates a sync client using legacy X-API-Key auth.
+func NewClientWithAPIKey(endpoint, apiToken string, s *store.Store) *Client {
+	return &Client{
+		endpoint:   endpoint,
+		authHeader: "X-API-Key",
+		authValue:  apiToken,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		store:     s,
+		batchSize: 100,
+	}
+}
+
+// SetSyncCheck sets a filter function for event types.
+func (c *Client) SetSyncCheck(fn func(string) bool) {
+	c.syncCheck = fn
+}
+
+// SetOnAuthExpired sets a callback for 401 responses.
+func (c *Client) SetOnAuthExpired(fn func()) {
+	c.onAuthExpired = fn
 }
 
 // SyncPayload is sent to the SC Bridge API.
@@ -70,7 +98,7 @@ func (c *Client) Run(ctx context.Context) error {
 }
 
 func (c *Client) syncBatch(ctx context.Context) error {
-	if c.apiToken == "" {
+	if c.authValue == "" {
 		return nil // Not authenticated, skip sync
 	}
 
@@ -83,12 +111,38 @@ func (c *Client) syncBatch(ctx context.Context) error {
 		return nil
 	}
 
-	payload := SyncPayload{
-		Events: make([]SyncEvent, len(events)),
+	// Filter events by sync preferences
+	var filtered []store.StoredEvent
+	for _, e := range events {
+		if c.syncCheck != nil && !c.syncCheck(e.Type) {
+			continue
+		}
+		filtered = append(filtered, e)
 	}
 
+	// Mark all as synced (even filtered-out ones — they shouldn't be retried)
 	var maxID int64
-	for i, e := range events {
+	for _, e := range events {
+		if e.ID > maxID {
+			maxID = e.ID
+		}
+	}
+
+	if len(filtered) == 0 {
+		// Nothing to send, but still mark as synced
+		if maxID > 0 {
+			if err := c.store.MarkSynced(maxID); err != nil {
+				return fmt.Errorf("mark synced: %w", err)
+			}
+		}
+		return nil
+	}
+
+	payload := SyncPayload{
+		Events: make([]SyncEvent, len(filtered)),
+	}
+
+	for i, e := range filtered {
 		var data map[string]string
 		if err := json.Unmarshal([]byte(e.DataJSON), &data); err != nil {
 			data = map[string]string{"raw": e.DataJSON}
@@ -99,10 +153,6 @@ func (c *Client) syncBatch(ctx context.Context) error {
 			Source:    e.Source,
 			Timestamp: e.Timestamp,
 			Data:      data,
-		}
-
-		if e.ID > maxID {
-			maxID = e.ID
 		}
 	}
 
@@ -116,7 +166,7 @@ func (c *Client) syncBatch(ctx context.Context) error {
 		return fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-API-Key", c.apiToken)
+	req.Header.Set(c.authHeader, c.authValue)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -124,6 +174,14 @@ func (c *Client) syncBatch(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body)
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		slog.Warn("sync auth expired (401)")
+		if c.onAuthExpired != nil {
+			c.onAuthExpired()
+		}
+		return fmt.Errorf("auth expired (401)")
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("api returned %d", resp.StatusCode)
@@ -134,13 +192,13 @@ func (c *Client) syncBatch(ctx context.Context) error {
 		return fmt.Errorf("mark synced: %w", err)
 	}
 
-	slog.Info("synced events", "count", len(events), "max_id", maxID)
+	slog.Info("synced events", "count", len(filtered), "max_id", maxID)
 	return nil
 }
 
 // Heartbeat sends a status ping to SC Bridge with current state.
 func (c *Client) Heartbeat(ctx context.Context, state map[string]string) error {
-	if c.apiToken == "" {
+	if c.authValue == "" {
 		return nil
 	}
 
@@ -150,7 +208,7 @@ func (c *Client) Heartbeat(ctx context.Context, state map[string]string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-API-Key", c.apiToken)
+	req.Header.Set(c.authHeader, c.authValue)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -158,6 +216,13 @@ func (c *Client) Heartbeat(ctx context.Context, state map[string]string) error {
 	}
 	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body)
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		slog.Warn("heartbeat auth expired (401)")
+		if c.onAuthExpired != nil {
+			c.onAuthExpired()
+		}
+	}
 
 	return nil
 }
