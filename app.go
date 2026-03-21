@@ -32,6 +32,7 @@ type App struct {
 	proxy     *grpcproxy.Proxy
 	tailer    *logtailer.Tailer
 	cigClient *cigclient.Client
+	syncMgr   *cigclient.SyncManager
 	mu        sync.Mutex
 	debugMode bool
 
@@ -57,6 +58,7 @@ type StatusInfo struct {
 	ProxyRunning  bool   `json:"proxyRunning"`
 	TailerActive  bool   `json:"tailerActive"`
 	GameConnected bool   `json:"gameConnected"`
+	SyncActive    bool   `json:"syncActive"`
 	EventCount    int    `json:"eventCount"`
 	LastEvent     string `json:"lastEvent"`
 	DebugMode     bool   `json:"debugMode"`
@@ -232,10 +234,6 @@ func (a *App) startup(ctx context.Context) {
 				"username", ld.Username,
 				"endpoint", ld.StarNetwork.ServicesEndpoint,
 			)
-			slog.Info("loginData.json detected",
-				"username", ld.Username,
-				"endpoint", ld.StarNetwork.ServicesEndpoint,
-			)
 
 			client, err := cigclient.NewClient(ld)
 			if err != nil {
@@ -257,22 +255,41 @@ func (a *App) startup(ctx context.Context) {
 
 			slog.Info("CIG client connected", "username", ld.Username)
 
-			// Auto-fetch wallet and friends on connect
-			if wallet, err := client.GetWallet(svcCtx); err != nil {
-				slog.Error("auto-fetch wallet failed", "error", err)
-			} else {
-				for _, w := range wallet {
-					slog.Info("wallet", "name", w.Name, "amount", w.Amount, "currency", w.Currency)
-				}
-			}
+			// Emit connection event to bus for debug view
+			a.bus.Publish(events.Event{
+				Type:      "cig_connected",
+				Source:    "grpc",
+				Timestamp: time.Now(),
+				Data:      map[string]string{"username": ld.Username},
+			})
 
-			if friends, err := client.GetFriends(svcCtx); err != nil {
-				slog.Error("auto-fetch friends failed", "error", err)
+			// Start gRPC data sync manager (handles wallet, friends, rep, etc.)
+			if cfg.APIToken != "" {
+				syncMgr := cigclient.NewSyncManager(client, cfg.APIEndpoint, cfg.APIToken)
+				syncMgr.SetOnSync(func(evt cigclient.SyncEvent) {
+					data := map[string]string{
+						"data_type": evt.DataType,
+						"count":     fmt.Sprintf("%d", evt.Count),
+					}
+					evtType := "grpc_sync_ok"
+					if evt.Error != "" {
+						evtType = "grpc_sync_error"
+						data["error"] = evt.Error
+					}
+					a.bus.Publish(events.Event{
+						Type:      evtType,
+						Source:    "grpc",
+						Timestamp: time.Now(),
+						Data:      data,
+					})
+				})
+				a.mu.Lock()
+				a.syncMgr = syncMgr
+				a.mu.Unlock()
+				go syncMgr.Run(svcCtx)
+				slog.Info("gRPC sync manager started")
 			} else {
-				slog.Info("friends", "count", len(friends))
-				for _, f := range friends {
-					slog.Info("friend", "nickname", f.Nickname, "displayName", f.DisplayName, "status", f.Status, "activity", f.Activity)
-				}
+				slog.Warn("gRPC sync manager not started — no API token configured")
 			}
 		})
 	}()
@@ -322,6 +339,7 @@ func (a *App) GetStatus() StatusInfo {
 
 	a.mu.Lock()
 	status.GameConnected = a.cigClient != nil
+	status.SyncActive = a.syncMgr != nil
 	a.mu.Unlock()
 
 	return status
@@ -394,6 +412,61 @@ func (a *App) GetFriends() ([]cigclient.Friend, error) {
 		return nil, fmt.Errorf("not connected — launch Star Citizen first")
 	}
 	return client.GetFriends(context.Background())
+}
+
+// GetReputation returns the player's reputation scores from CIG's API.
+func (a *App) GetReputation() ([]cigclient.ReputationScore, error) {
+	a.mu.Lock()
+	client := a.cigClient
+	a.mu.Unlock()
+	if client == nil {
+		return nil, fmt.Errorf("not connected — launch Star Citizen first")
+	}
+	return client.GetReputation(context.Background())
+}
+
+// GetBlueprints returns the player's blueprint collection from CIG's API.
+func (a *App) GetBlueprints() ([]cigclient.Blueprint, error) {
+	a.mu.Lock()
+	client := a.cigClient
+	a.mu.Unlock()
+	if client == nil {
+		return nil, fmt.Errorf("not connected — launch Star Citizen first")
+	}
+	return client.GetBlueprints(context.Background())
+}
+
+// GetEntitlements returns the player's entitlements from CIG's API.
+func (a *App) GetEntitlements() ([]cigclient.Entitlement, error) {
+	a.mu.Lock()
+	client := a.cigClient
+	a.mu.Unlock()
+	if client == nil {
+		return nil, fmt.Errorf("not connected — launch Star Citizen first")
+	}
+	return client.GetEntitlements(context.Background())
+}
+
+// GetActiveMissions returns the player's active missions from CIG's API.
+func (a *App) GetActiveMissions() ([]cigclient.Mission, error) {
+	a.mu.Lock()
+	client := a.cigClient
+	a.mu.Unlock()
+	if client == nil {
+		return nil, fmt.Errorf("not connected — launch Star Citizen first")
+	}
+	return client.GetActiveMissions(context.Background())
+}
+
+// GetStats returns the player's stats from CIG's API.
+func (a *App) GetStats() ([]cigclient.PlayerStat, error) {
+	a.mu.Lock()
+	client := a.cigClient
+	a.mu.Unlock()
+	if client == nil {
+		return nil, fmt.Errorf("not connected — launch Star Citizen first")
+	}
+	return client.GetStats(context.Background())
 }
 
 // IsGameConnected returns whether we have an active CIG API connection.

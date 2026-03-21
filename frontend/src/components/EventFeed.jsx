@@ -16,6 +16,9 @@ const TYPE_COLORS = {
   'money_sent': 'text-yellow-400',
   'injury': 'text-red-400',
   'incapacitated': 'text-red-500',
+  'cig_connected': 'text-emerald-400',
+  'grpc_sync_ok': 'text-cyan-400',
+  'grpc_sync_error': 'text-red-400',
 }
 
 function EventFeed({ events }) {

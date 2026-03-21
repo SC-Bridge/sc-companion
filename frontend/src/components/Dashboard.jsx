@@ -1,4 +1,4 @@
-import { Radio, FileText, Database, Shield } from 'lucide-react'
+import { Radio, FileText, Database, Shield, Zap, RefreshCw } from 'lucide-react'
 
 const StatCard = ({ icon: Icon, label, value }) => (
   <div
@@ -89,9 +89,14 @@ function Dashboard({ status }) {
       {/* Stats grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
         <StatCard
-          icon={Radio}
-          label="gRPC Proxy"
-          value={status?.proxyRunning ? 'Active' : 'Inactive'}
+          icon={Zap}
+          label="CIG API"
+          value={status?.gameConnected ? 'Connected' : 'Waiting'}
+        />
+        <StatCard
+          icon={RefreshCw}
+          label="Data Sync"
+          value={status?.syncActive ? 'Active' : 'Inactive'}
         />
         <StatCard
           icon={FileText}
@@ -102,11 +107,6 @@ function Dashboard({ status }) {
           icon={Database}
           label="Events"
           value={status?.eventCount || 0}
-        />
-        <StatCard
-          icon={Shield}
-          label="Last Event"
-          value={status?.lastEvent || '—'}
         />
       </div>
 
@@ -122,15 +122,21 @@ function Dashboard({ status }) {
             active={status?.tailerActive}
           />
           <DataSourceRow
-            label="gRPC Interceptor"
-            description="Captures wallet balance, reputation, blueprints, friend presence from CIG backend"
-            active={status?.proxyRunning}
+            label="CIG gRPC Client"
+            description="Direct connection to CIG backend — wallet, friends, reputation, blueprints, entitlements, missions, stats"
+            active={status?.gameConnected}
+            note="Launch Star Citizen to connect"
           />
           <DataSourceRow
-            label="API Sync"
-            description="Uploads events to scbridge.app for fleet tracking and analysis"
-            active={false}
+            label="Data Sync to SC Bridge"
+            description="Syncs gRPC data to scbridge.app on a schedule (wallet 30s, friends 60s, rep 5m, entitlements 10m)"
+            active={status?.syncActive}
             note="Set API token in settings"
+          />
+          <DataSourceRow
+            label="gRPC Proxy"
+            description="MITM proxy for capturing raw gRPC traffic (advanced debugging)"
+            active={status?.proxyRunning}
           />
         </div>
       </div>

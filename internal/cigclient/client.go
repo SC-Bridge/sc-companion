@@ -2,6 +2,7 @@ package cigclient
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -33,6 +34,68 @@ type Friend struct {
 	AccountID   uint32 `json:"accountId"`
 	Status      string `json:"status"` // offline, online, away, etc.
 	Activity    string `json:"activity"`
+}
+
+// ReputationScore represents a faction reputation score.
+type ReputationScore struct {
+	EntityID     string  `json:"entity_id"`
+	Scope        string  `json:"scope"`
+	Score        int32   `json:"score"`
+	StandingTier string  `json:"standing_tier"`
+	Drift        float64 `json:"drift"`
+}
+
+// ReputationHistoryEntry represents a single score history data point.
+type ReputationHistoryEntry struct {
+	EntityID       string `json:"entity_id"`
+	Scope          string `json:"scope"`
+	Score          uint64 `json:"score"`
+	EventTimestamp uint32 `json:"event_timestamp"`
+}
+
+// Blueprint represents a blueprint collection entry.
+type Blueprint struct {
+	BlueprintID   string `json:"blueprint_id"`
+	CategoryID    string `json:"category_id"`
+	ItemClassID   string `json:"item_class_id"`
+	Tier          uint32 `json:"tier"`
+	RemainingUses int32  `json:"remaining_uses"`
+	Source        string `json:"source"`
+	ProcessType   string `json:"process_type"`
+}
+
+// Entitlement represents an in-game entitlement (ship, item).
+type Entitlement struct {
+	URN               string `json:"urn"`
+	Name              string `json:"name"`
+	EntityClassGUID   string `json:"entity_class_guid"`
+	EntitlementType   string `json:"entitlement_type"`
+	Status            string `json:"status"`
+	ItemType          string `json:"item_type"`
+	Source            string `json:"source"`
+	InsuranceLifetime bool   `json:"insurance_lifetime"`
+	InsuranceDuration uint64 `json:"insurance_duration"`
+}
+
+// Mission represents an active or recent mission.
+type Mission struct {
+	MissionID  string `json:"mission_id"`
+	ContractID string `json:"contract_id"`
+	Template   string `json:"template"`
+	State      string `json:"state"`
+	Title      string `json:"title"`
+	RewardAUEC uint64 `json:"reward_auec"`
+	ExpiresAt  string `json:"expires_at"`
+	Objectives string `json:"objectives_json"` // JSON-encoded objectives
+}
+
+// PlayerStat represents a player statistic.
+type PlayerStat struct {
+	StatDefID string `json:"stat_def_id"`
+	Value     uint32 `json:"value"`
+	Best      uint32 `json:"best"`
+	Category  string `json:"category"`
+	GameMode  string `json:"game_mode"`
 }
 
 // Client is a direct gRPC client to CIG's game services.
@@ -253,6 +316,474 @@ func (c *Client) GetFriends(ctx context.Context) ([]Friend, error) {
 	}
 
 	return friends, nil
+}
+
+// GetReputation returns the player's reputation scores across all factions.
+func (c *Client) GetReputation(ctx context.Context) ([]ReputationScore, error) {
+	resp, err := c.call(ctx, "/sc.external.services.reputation.v1.ReputationService/QueryReputations", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonBytes, _ := protojson.Marshal(resp)
+	slog.Debug("QueryReputations response", "json", string(jsonBytes))
+
+	var scores []ReputationScore
+	resultsField := resp.Descriptor().Fields().ByName("results")
+	if resultsField == nil {
+		return nil, fmt.Errorf("no results field in QueryReputations response")
+	}
+
+	list := resp.Get(resultsField).List()
+	for i := 0; i < list.Len(); i++ {
+		vr := list.Get(i).Message()
+
+		// VersionedReputation has nested reputation + standing
+		repField := vr.Descriptor().Fields().ByName("reputation")
+		if repField == nil {
+			continue
+		}
+		rep := vr.Get(repField).Message()
+
+		entityID := rep.Get(rep.Descriptor().Fields().ByName("entity")).String()
+		scope := rep.Get(rep.Descriptor().Fields().ByName("scope")).String()
+		score := int32(rep.Get(rep.Descriptor().Fields().ByName("score")).Int())
+
+		// Extract standing tier name
+		standingTier := ""
+		standingField := vr.Descriptor().Fields().ByName("standing")
+		if standingField != nil {
+			standing := vr.Get(standingField).Message()
+			nameField := standing.Descriptor().Fields().ByName("name")
+			if nameField != nil {
+				standingTier = standing.Get(nameField).String()
+			}
+		}
+
+		// Extract drift from lock or standing
+		var drift float64
+		standingDriftField := func() *float64 {
+			if standingField == nil {
+				return nil
+			}
+			s := vr.Get(standingField).Message()
+			df := s.Descriptor().Fields().ByName("drift")
+			if df == nil {
+				return nil
+			}
+			driftMsg := s.Get(df).Message()
+			amountField := driftMsg.Descriptor().Fields().ByName("amount")
+			if amountField == nil {
+				return nil
+			}
+			v := float64(driftMsg.Get(amountField).Int())
+			return &v
+		}()
+		if standingDriftField != nil {
+			drift = *standingDriftField
+		}
+
+		scores = append(scores, ReputationScore{
+			EntityID:     entityID,
+			Scope:        scope,
+			Score:        score,
+			StandingTier: standingTier,
+			Drift:        drift,
+		})
+	}
+
+	return scores, nil
+}
+
+// GetReputationHistory returns score history for the given reputation IDs.
+func (c *Client) GetReputationHistory(ctx context.Context, reputationIDs []string, days uint32) ([]ReputationHistoryEntry, error) {
+	resp, err := c.call(ctx, "/sc.external.services.reputation.v1.ReputationService/GetScoreHistory", func(req *dynamicpb.Message) {
+		// Build repeated ScoreHistory entries
+		scoresField := req.Descriptor().Fields().ByName("reputation_scores")
+		if scoresField == nil {
+			return
+		}
+		list := req.Mutable(scoresField).List()
+		for _, id := range reputationIDs {
+			entry := dynamicpb.NewMessage(scoresField.Message())
+			entry.Set(entry.Descriptor().Fields().ByName("reputation_id"), protoreflect.ValueOfString(id))
+			entry.Set(entry.Descriptor().Fields().ByName("days"), protoreflect.ValueOfUint32(days))
+			list.Append(protoreflect.ValueOfMessage(entry))
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	jsonBytes, _ := protojson.Marshal(resp)
+	slog.Debug("GetScoreHistory response", "json", string(jsonBytes))
+
+	var entries []ReputationHistoryEntry
+	resultsField := resp.Descriptor().Fields().ByName("reputation_scores")
+	if resultsField == nil {
+		return entries, nil
+	}
+
+	list := resp.Get(resultsField).List()
+	for i := 0; i < list.Len(); i++ {
+		histMsg := list.Get(i).Message()
+		repID := histMsg.Get(histMsg.Descriptor().Fields().ByName("reputation_id")).String()
+
+		scoresField := histMsg.Descriptor().Fields().ByName("scores")
+		if scoresField == nil {
+			continue
+		}
+		scoresList := histMsg.Get(scoresField).List()
+		for j := 0; j < scoresList.Len(); j++ {
+			scoreMsg := scoresList.Get(j).Message()
+			entries = append(entries, ReputationHistoryEntry{
+				EntityID:       repID,
+				Scope:          "default",
+				Score:          scoreMsg.Get(scoreMsg.Descriptor().Fields().ByName("score")).Uint(),
+				EventTimestamp: uint32(scoreMsg.Get(scoreMsg.Descriptor().Fields().ByName("timestamp")).Uint()),
+			})
+		}
+	}
+
+	return entries, nil
+}
+
+// GetBlueprints returns the player's blueprint collection.
+func (c *Client) GetBlueprints(ctx context.Context) ([]Blueprint, error) {
+	resp, err := c.call(ctx, "/sc.external.services.blueprint_library.v1.BlueprintLibraryService/QueryBlueprintEntries", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonBytes, _ := protojson.Marshal(resp)
+	slog.Debug("QueryBlueprintEntries response", "json", string(jsonBytes))
+
+	blueprintSources := []string{"UNSPECIFIED", "GAMEPLAY", "PLATFORM"}
+	blueprintProcessTypes := []string{"UNSPECIFIED", "CREATE", "REFINE", "REPAIR", "UPGRADE", "DISMANTLE", "RESEARCH"}
+
+	var blueprints []Blueprint
+	resultsField := resp.Descriptor().Fields().ByName("results")
+	if resultsField == nil {
+		return blueprints, nil
+	}
+
+	list := resp.Get(resultsField).List()
+	for i := 0; i < list.Len(); i++ {
+		entry := list.Get(i).Message()
+
+		blueprintID := entry.Get(entry.Descriptor().Fields().ByName("blueprint_id")).String()
+		categoryID := entry.Get(entry.Descriptor().Fields().ByName("category_id")).String()
+		itemClassID := entry.Get(entry.Descriptor().Fields().ByName("item_class_id")).String()
+		tier := uint32(entry.Get(entry.Descriptor().Fields().ByName("tier")).Uint())
+		remainingUses := int32(entry.Get(entry.Descriptor().Fields().ByName("remaining_uses")).Int())
+
+		sourceNum := int(entry.Get(entry.Descriptor().Fields().ByName("source")).Enum())
+		source := "UNSPECIFIED"
+		if sourceNum >= 0 && sourceNum < len(blueprintSources) {
+			source = blueprintSources[sourceNum]
+		}
+
+		processNum := int(entry.Get(entry.Descriptor().Fields().ByName("process_type")).Enum())
+		processType := "UNSPECIFIED"
+		if processNum >= 0 && processNum < len(blueprintProcessTypes) {
+			processType = blueprintProcessTypes[processNum]
+		}
+
+		blueprints = append(blueprints, Blueprint{
+			BlueprintID:   blueprintID,
+			CategoryID:    categoryID,
+			ItemClassID:   itemClassID,
+			Tier:          tier,
+			RemainingUses: remainingUses,
+			Source:        source,
+			ProcessType:   processType,
+		})
+	}
+
+	return blueprints, nil
+}
+
+// GetEntitlements returns the player's entitlements (ships, items).
+func (c *Client) GetEntitlements(ctx context.Context) ([]Entitlement, error) {
+	resp, err := c.call(ctx, "/sc.external.services.entitlement.v1.ExternalEntitlementService/Query", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonBytes, _ := protojson.Marshal(resp)
+	slog.Debug("EntitlementService/Query response", "json", string(jsonBytes))
+
+	entitlementTypes := []string{"UNSPECIFIED", "PERMANENT", "RENTAL"}
+	entitlementStatuses := []string{"UNSPECIFIED", "PENDING", "FULFILLED", "REVOKED", "UNCLAIMED", "FAILED"}
+	entitlementSources := []string{"UNSPECIFIED", "PLATFORM", "ARENA_COMMANDER", "STAR_MARINE", "PERSISTENT_UNIVERSE", "LONGTERM_PERSISTENCE"}
+	entitlementItemTypes := []string{"UNSPECIFIED", "SHIP", "HANGAR", "HANGAR_DECORATION", "OTHER"}
+
+	var entitlements []Entitlement
+	resultsField := resp.Descriptor().Fields().ByName("results")
+	if resultsField == nil {
+		return entitlements, nil
+	}
+
+	list := resp.Get(resultsField).List()
+	for i := 0; i < list.Len(); i++ {
+		e := list.Get(i).Message()
+
+		urn := e.Get(e.Descriptor().Fields().ByName("urn")).String()
+		name := e.Get(e.Descriptor().Fields().ByName("name")).String()
+		entityClassGUID := e.Get(e.Descriptor().Fields().ByName("entity_class_guid")).String()
+
+		typeNum := int(e.Get(e.Descriptor().Fields().ByName("type")).Enum())
+		eType := "PERMANENT"
+		if typeNum >= 0 && typeNum < len(entitlementTypes) {
+			eType = entitlementTypes[typeNum]
+		}
+
+		statusNum := int(e.Get(e.Descriptor().Fields().ByName("status")).Enum())
+		eStatus := "UNSPECIFIED"
+		if statusNum >= 0 && statusNum < len(entitlementStatuses) {
+			eStatus = entitlementStatuses[statusNum]
+		}
+
+		sourceNum := int(e.Get(e.Descriptor().Fields().ByName("source")).Enum())
+		eSource := "UNSPECIFIED"
+		if sourceNum >= 0 && sourceNum < len(entitlementSources) {
+			eSource = entitlementSources[sourceNum]
+		}
+
+		itemTypeNum := int(e.Get(e.Descriptor().Fields().ByName("item_type")).Enum())
+		eItemType := "UNSPECIFIED"
+		if itemTypeNum >= 0 && itemTypeNum < len(entitlementItemTypes) {
+			eItemType = entitlementItemTypes[itemTypeNum]
+		}
+
+		// Extract insurance info
+		isLifetime := false
+		var duration uint64
+		insuranceField := e.Descriptor().Fields().ByName("insurance")
+		if insuranceField != nil && e.Has(insuranceField) {
+			insurance := e.Get(insuranceField).Message()
+			policyField := insurance.Descriptor().Fields().ByName("policy")
+			if policyField != nil && insurance.Has(policyField) {
+				policy := insurance.Get(policyField).Message()
+				lifetimeField := policy.Descriptor().Fields().ByName("lifetime")
+				if lifetimeField != nil && policy.Has(lifetimeField) {
+					isLifetime = true
+				}
+				durationField := policy.Descriptor().Fields().ByName("duration")
+				if durationField != nil && policy.Has(durationField) {
+					dur := policy.Get(durationField).Message()
+					expiresField := dur.Descriptor().Fields().ByName("expires_at")
+					if expiresField != nil {
+						duration = dur.Get(expiresField).Uint()
+					}
+				}
+			}
+		}
+
+		entitlements = append(entitlements, Entitlement{
+			URN:               urn,
+			Name:              name,
+			EntityClassGUID:   entityClassGUID,
+			EntitlementType:   eType,
+			Status:            eStatus,
+			ItemType:          eItemType,
+			Source:            eSource,
+			InsuranceLifetime: isLifetime,
+			InsuranceDuration: duration,
+		})
+	}
+
+	return entitlements, nil
+}
+
+// GetActiveMissions returns active missions (2-step: get IDs, then details).
+func (c *Client) GetActiveMissions(ctx context.Context) ([]Mission, error) {
+	// Step 1: Get active mission IDs
+	activeResp, err := c.call(ctx, "/sc.external.services.mission_service.v1.MissionService/QueryActiveMissions", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	idsField := activeResp.Descriptor().Fields().ByName("mission_ids")
+	if idsField == nil {
+		return nil, nil
+	}
+
+	idsList := activeResp.Get(idsField).List()
+	if idsList.Len() == 0 {
+		return nil, nil
+	}
+
+	// Collect mission IDs
+	var missionIDs []string
+	for i := 0; i < idsList.Len(); i++ {
+		body := idsList.Get(i).Message()
+		mid := body.Get(body.Descriptor().Fields().ByName("mission_id")).String()
+		if mid != "" {
+			missionIDs = append(missionIDs, mid)
+		}
+	}
+
+	if len(missionIDs) == 0 {
+		return nil, nil
+	}
+
+	// Step 2: Get mission details
+	detailResp, err := c.call(ctx, "/sc.external.services.mission_service.v1.MissionService/QueryMissions", func(req *dynamicpb.Message) {
+		queriesField := req.Descriptor().Fields().ByName("queries")
+		if queriesField == nil {
+			return
+		}
+		list := req.Mutable(queriesField).List()
+		for _, mid := range missionIDs {
+			body := dynamicpb.NewMessage(queriesField.Message())
+			body.Set(body.Descriptor().Fields().ByName("mission_id"), protoreflect.ValueOfString(mid))
+			list.Append(protoreflect.ValueOfMessage(body))
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	jsonBytes, _ := protojson.Marshal(detailResp)
+	slog.Debug("QueryMissions response", "json", string(jsonBytes))
+
+	missionStates := []string{"UNSPECIFIED", "PENDING", "ACTIVE", "SUSPENDED", "COMPLETED", "FAILED", "EXPIRED", "ENDED", "WITHDRAWN"}
+
+	var missions []Mission
+	missionsField := detailResp.Descriptor().Fields().ByName("missions")
+	if missionsField == nil {
+		return missions, nil
+	}
+
+	missionsList := detailResp.Get(missionsField).List()
+	for i := 0; i < missionsList.Len(); i++ {
+		m := missionsList.Get(i).Message()
+
+		missionID := m.Get(m.Descriptor().Fields().ByName("mission_id")).String()
+		contractID := m.Get(m.Descriptor().Fields().ByName("contract_id")).String()
+
+		// Extract template contract_definition_id
+		template := ""
+		templateField := m.Descriptor().Fields().ByName("mission_template")
+		if templateField != nil && m.Has(templateField) {
+			tmpl := m.Get(templateField).Message()
+			defField := tmpl.Descriptor().Fields().ByName("contract_definition_id")
+			if defField != nil {
+				template = tmpl.Get(defField).String()
+			}
+		}
+
+		stateNum := int(m.Get(m.Descriptor().Fields().ByName("mission_state")).Enum())
+		state := "UNSPECIFIED"
+		if stateNum >= 0 && stateNum < len(missionStates) {
+			state = missionStates[stateNum]
+		}
+
+		// Extract reward aUEC — MissionReward structure is complex, best-effort
+		var rewardAUEC uint64
+		rewardField := m.Descriptor().Fields().ByName("reward")
+		if rewardField != nil && m.Has(rewardField) {
+			reward := m.Get(rewardField).Message()
+			// Try to find a currency_amount or similar field
+			for k := 0; k < reward.Descriptor().Fields().Len(); k++ {
+				f := reward.Descriptor().Fields().Get(k)
+				slog.Debug("mission reward field", "name", f.Name(), "kind", f.Kind())
+			}
+		}
+
+		// Extract expiry timestamp
+		expiresAt := ""
+		expiryField := m.Descriptor().Fields().ByName("expiry")
+		if expiryField != nil && m.Has(expiryField) {
+			expiry := m.Get(expiryField).Message()
+			secondsField := expiry.Descriptor().Fields().ByName("seconds")
+			if secondsField != nil {
+				secs := expiry.Get(secondsField).Int()
+				if secs > 0 {
+					expiresAt = fmt.Sprintf("%d", secs)
+				}
+			}
+		}
+
+		// Serialize objectives as JSON
+		objectives := ""
+		objField := m.Descriptor().Fields().ByName("mission_objectives")
+		if objField != nil {
+			objList := m.Get(objField).List()
+			if objList.Len() > 0 {
+				// Marshal the whole objectives list to JSON
+				type objSummary struct {
+					ID       string `json:"id"`
+					State    int    `json:"state"`
+					Progress int64  `json:"progress"`
+					Max      int64  `json:"max"`
+				}
+				var objs []objSummary
+				for j := 0; j < objList.Len(); j++ {
+					obj := objList.Get(j).Message()
+					objID := obj.Get(obj.Descriptor().Fields().ByName("objective_id")).String()
+					objState := int(obj.Get(obj.Descriptor().Fields().ByName("state")).Enum())
+					progress := obj.Get(obj.Descriptor().Fields().ByName("progress_counter_current")).Int()
+					max := obj.Get(obj.Descriptor().Fields().ByName("progress_counter_max")).Int()
+					objs = append(objs, objSummary{ID: objID, State: objState, Progress: progress, Max: max})
+				}
+				if objJSON, err := json.Marshal(objs); err == nil {
+					objectives = string(objJSON)
+				}
+			}
+		}
+
+		missions = append(missions, Mission{
+			MissionID:  missionID,
+			ContractID: contractID,
+			Template:   template,
+			State:      state,
+			RewardAUEC: rewardAUEC,
+			ExpiresAt:  expiresAt,
+			Objectives: objectives,
+		})
+	}
+
+	return missions, nil
+}
+
+// GetStats returns the player's stats.
+func (c *Client) GetStats(ctx context.Context) ([]PlayerStat, error) {
+	resp, err := c.call(ctx, "/sc.external.services.stats.v1.StatsService/FindStats", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonBytes, _ := protojson.Marshal(resp)
+	slog.Debug("FindStats response", "json", string(jsonBytes))
+
+	var stats []PlayerStat
+	resultsField := resp.Descriptor().Fields().ByName("results")
+	if resultsField == nil {
+		return stats, nil
+	}
+
+	list := resp.Get(resultsField).List()
+	for i := 0; i < list.Len(); i++ {
+		s := list.Get(i).Message()
+
+		statDefID := s.Get(s.Descriptor().Fields().ByName("stat_def_id")).String()
+		value := uint32(s.Get(s.Descriptor().Fields().ByName("value")).Uint())
+		best := uint32(s.Get(s.Descriptor().Fields().ByName("best")).Uint())
+		category := s.Get(s.Descriptor().Fields().ByName("category")).String()
+		gameMode := s.Get(s.Descriptor().Fields().ByName("game_mode")).String()
+
+		stats = append(stats, PlayerStat{
+			StatDefID: statDefID,
+			Value:     value,
+			Best:      best,
+			Category:  category,
+			GameMode:  gameMode,
+		})
+	}
+
+	return stats, nil
 }
 
 // call makes a unary gRPC call using dynamicpb.
