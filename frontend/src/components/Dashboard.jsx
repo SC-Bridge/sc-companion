@@ -1,7 +1,4 @@
-import { useState } from 'react'
-import { FileText, Database, Zap, RefreshCw, Play } from 'lucide-react'
-
-const wails = window.go?.main?.App
+import { FileText, Database } from 'lucide-react'
 
 const StatCard = ({ icon: Icon, label, value }) => (
   <div
@@ -92,16 +89,6 @@ function Dashboard({ status }) {
       {/* Stats grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
         <StatCard
-          icon={Zap}
-          label="CIG API"
-          value={status?.gameConnected ? 'Connected' : 'Waiting'}
-        />
-        <StatCard
-          icon={RefreshCw}
-          label="Data Sync"
-          value={status?.syncActive ? 'Active' : 'Inactive'}
-        />
-        <StatCard
           icon={FileText}
           label="Game.log"
           value={status?.tailerActive ? 'Tailing' : 'Disconnected'}
@@ -113,9 +100,6 @@ function Dashboard({ status }) {
         />
       </div>
 
-      {/* Test gRPC button */}
-      {status?.gameConnected && <TestGrpcButton />}
-
       {/* Connection info card */}
       <div style={{ padding: 24, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12 }}>
         <h3 className="font-[family-name:var(--font-display)]" style={{ fontSize: 14, letterSpacing: '0.05em', color: '#9ca3af', textTransform: 'uppercase', marginBottom: 24 }}>
@@ -124,81 +108,17 @@ function Dashboard({ status }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <DataSourceRow
             label="Game.log Tailer"
-            description="Parses in-game events: ship boarding, contracts, location changes, money transfers"
+            description="Parses in-game events: ship boarding, contracts, location changes, money transfers, missions, quantum travel"
             active={status?.tailerActive}
           />
           <DataSourceRow
-            label="CIG gRPC Client"
-            description="Direct connection to CIG backend — wallet, friends, reputation, blueprints, entitlements, missions, stats"
-            active={status?.gameConnected}
-            note="Launch Star Citizen to connect"
-          />
-          <DataSourceRow
-            label="Data Sync to SC Bridge"
-            description="Syncs gRPC data to scbridge.app on a schedule (wallet 30s, friends 60s, rep 5m, entitlements 10m)"
-            active={status?.syncActive}
+            label="Event Sync to SC Bridge"
+            description="Uploads game events to scbridge.app for fleet tracking and analysis"
+            active={false}
             note="Set API token in settings"
           />
         </div>
       </div>
-    </div>
-  )
-}
-
-function TestGrpcButton() {
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
-
-  const handleTest = async () => {
-    if (!wails) return
-    setLoading(true)
-    setResult(null)
-    try {
-      const summary = await wails.TestAllGrpc()
-      setResult(summary)
-    } catch (e) {
-      setResult('Error: ' + e.message)
-    }
-    setLoading(false)
-  }
-
-  return (
-    <div style={{ padding: 20, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: result ? 16 : 0 }}>
-        <button
-          onClick={handleTest}
-          disabled={loading}
-          className="font-[family-name:var(--font-display)] tracking-wider uppercase"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '10px 20px', fontSize: 13,
-            background: loading ? 'rgba(34,211,238,0.05)' : 'rgba(34,211,238,0.1)',
-            border: '1px solid rgba(34,211,238,0.2)',
-            borderRadius: 8, color: '#22d3ee', cursor: loading ? 'wait' : 'pointer',
-            transition: 'all 0.2s',
-          }}
-        >
-          <Play size={14} />
-          {loading ? 'Fetching...' : 'Test All gRPC Data'}
-        </button>
-        <span className="text-xs text-gray-600">
-          Fetches wallet, friends, reputation, blueprints, entitlements, missions, stats
-        </span>
-      </div>
-      {result && (
-        <div className="font-[family-name:var(--font-mono)] text-xs leading-relaxed"
-          style={{ padding: 12, background: 'rgba(0,0,0,0.3)', borderRadius: 8, color: '#9ca3af', whiteSpace: 'pre-wrap' }}
-        >
-          {result.split(' | ').map((line, i) => {
-            const isError = line.includes('ERROR')
-            return (
-              <div key={i} style={{ color: isError ? '#f87171' : '#2ec4b6', padding: '2px 0' }}>
-                {line}
-              </div>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }

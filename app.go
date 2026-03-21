@@ -2,17 +2,14 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/SC-Bridge/sc-companion/internal/cigclient"
 	"github.com/SC-Bridge/sc-companion/internal/config"
 	"github.com/SC-Bridge/sc-companion/internal/events"
 	"github.com/SC-Bridge/sc-companion/internal/logtailer"
@@ -23,20 +20,18 @@ import (
 
 // App is the main application struct bound to the Wails frontend.
 type App struct {
-	ctx       context.Context
-	cancel    context.CancelFunc
-	cfg       *config.Config
-	bus       *events.Bus
-	db        *store.Store
-	trayCtrl  *tray.Controller
-	tailer    *logtailer.Tailer
-	cigClient *cigclient.Client
-	syncMgr   *cigclient.SyncManager
-	mu        sync.Mutex
+	ctx      context.Context
+	cancel   context.CancelFunc
+	cfg      *config.Config
+	bus      *events.Bus
+	db       *store.Store
+	trayCtrl *tray.Controller
+	tailer   *logtailer.Tailer
+	mu       sync.Mutex
 	debugMode bool
 
 	// Recent events buffer for debug view
-	eventsMu    sync.Mutex
+	eventsMu     sync.Mutex
 	recentEvents []EventEntry
 }
 
@@ -50,24 +45,22 @@ type EventEntry struct {
 
 // StatusInfo represents the current app status for the frontend.
 type StatusInfo struct {
-	PlayerHandle  string `json:"playerHandle"`
-	CurrentShip   string `json:"currentShip"`
-	Location      string `json:"location"`
-	Jurisdiction  string `json:"jurisdiction"`
-	TailerActive  bool   `json:"tailerActive"`
-	GameConnected bool   `json:"gameConnected"`
-	SyncActive    bool   `json:"syncActive"`
-	EventCount    int    `json:"eventCount"`
-	LastEvent     string `json:"lastEvent"`
-	DebugMode     bool   `json:"debugMode"`
+	PlayerHandle string `json:"playerHandle"`
+	CurrentShip  string `json:"currentShip"`
+	Location     string `json:"location"`
+	Jurisdiction string `json:"jurisdiction"`
+	TailerActive bool   `json:"tailerActive"`
+	EventCount   int    `json:"eventCount"`
+	LastEvent    string `json:"lastEvent"`
+	DebugMode    bool   `json:"debugMode"`
 }
 
 // AppConfig represents the user-facing configuration.
 type AppConfig struct {
-	LogPath      string `json:"logPath"`
-	APIEndpoint  string `json:"apiEndpoint"`
-	APIToken     string `json:"apiToken"`
-	DebugMode    bool   `json:"debugMode"`
+	LogPath     string `json:"logPath"`
+	APIEndpoint string `json:"apiEndpoint"`
+	APIToken    string `json:"apiToken"`
+	DebugMode   bool   `json:"debugMode"`
 }
 
 const maxRecentEvents = 200
@@ -158,7 +151,7 @@ func (a *App) startup(ctx context.Context) {
 		slog.Debug("event", "type", merged.Type, "data", merged.Data)
 	})
 
-	// Start API sync
+	// Start API sync (event sync to scbridge.app)
 	if cfg.APIToken != "" {
 		syncClient := storesync.NewClient(cfg.APIEndpoint, cfg.APIToken, db)
 		go syncClient.Run(svcCtx)
@@ -181,94 +174,6 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}
 
-	// Watch for loginData.json and connect CIG client
-	go func() {
-		// Build list of all possible loginData.json paths
-		var watchPaths []string
-		drives := []string{"C", "D", "E", "F"}
-		variants := []string{"LIVE", "PTU", "EPTU"}
-		baseDirs := []string{
-			"Roberts Space Industries\\StarCitizen",
-			"Program Files\\Roberts Space Industries\\StarCitizen",
-			"Games\\Roberts Space Industries\\StarCitizen",
-		}
-		for _, d := range drives {
-			for _, base := range baseDirs {
-				for _, v := range variants {
-					p := filepath.Join(d+`:\`, base, v, "loginData.json")
-					watchPaths = append(watchPaths, p)
-				}
-			}
-		}
-
-		slog.Info("watching for loginData.json", "paths", len(watchPaths))
-
-		// Poll all paths for loginData.json
-		cigclient.WatchLoginDataMulti(watchPaths, func(ld *cigclient.LoginData, path string) {
-			slog.Info("loginData.json detected",
-				"path", path,
-				"endpoint", ld.StarNetwork.ServicesEndpoint,
-			)
-
-			client, err := cigclient.NewClient(ld)
-			if err != nil {
-				slog.Error("failed to create CIG client", "error", err)
-				return
-			}
-
-			if err := client.Connect(svcCtx); err != nil {
-				slog.Error("failed to connect CIG client", "error", err)
-				return
-			}
-
-			a.mu.Lock()
-			if a.cigClient != nil {
-				a.cigClient.Close()
-			}
-			a.cigClient = client
-			a.mu.Unlock()
-
-			slog.Info("CIG client connected")
-
-			// Emit connection event to bus for debug view
-			a.bus.Publish(events.Event{
-				Type:      "cig_connected",
-				Source:    "grpc",
-				Timestamp: time.Now(),
-				Data:      map[string]string{},
-			})
-
-			// Start gRPC data sync manager (handles wallet, friends, rep, etc.)
-			if cfg.APIToken != "" {
-				syncMgr := cigclient.NewSyncManager(client, cfg.APIEndpoint, cfg.APIToken)
-				syncMgr.SetOnSync(func(evt cigclient.SyncEvent) {
-					data := map[string]string{
-						"data_type": evt.DataType,
-						"count":     fmt.Sprintf("%d", evt.Count),
-					}
-					evtType := "grpc_sync_ok"
-					if evt.Error != "" {
-						evtType = "grpc_sync_error"
-						data["error"] = evt.Error
-					}
-					a.bus.Publish(events.Event{
-						Type:      evtType,
-						Source:    "grpc",
-						Timestamp: time.Now(),
-						Data:      data,
-					})
-				})
-				a.mu.Lock()
-				a.syncMgr = syncMgr
-				a.mu.Unlock()
-				go syncMgr.Run(svcCtx)
-				slog.Info("gRPC sync manager started")
-			} else {
-				slog.Warn("gRPC sync manager not started — no API token configured")
-			}
-		})
-	}()
-
 	slog.Info("SC Bridge Companion started")
 }
 
@@ -276,9 +181,6 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) shutdown(ctx context.Context) {
 	if a.cancel != nil {
 		a.cancel()
-	}
-	if a.cigClient != nil {
-		a.cigClient.Close()
 	}
 	if a.db != nil {
 		a.db.Close()
@@ -307,11 +209,6 @@ func (a *App) GetStatus() StatusInfo {
 	}
 
 	status.TailerActive = a.tailer != nil
-
-	a.mu.Lock()
-	status.GameConnected = a.cigClient != nil
-	status.SyncActive = a.syncMgr != nil
-	a.mu.Unlock()
 
 	return status
 }
@@ -359,241 +256,4 @@ func (a *App) GetTotalEvents() int {
 	}
 	total, _ := a.db.TotalEvents()
 	return total
-}
-
-// GetWallet returns the player's wallet balances from CIG's API.
-func (a *App) GetWallet() ([]cigclient.WalletBalance, error) {
-	a.mu.Lock()
-	client := a.cigClient
-	a.mu.Unlock()
-	if client == nil {
-		return nil, fmt.Errorf("not connected — launch Star Citizen first")
-	}
-	return client.GetWallet(context.Background())
-}
-
-// GetFriends returns the player's friend list from CIG's API.
-func (a *App) GetFriends() ([]cigclient.Friend, error) {
-	a.mu.Lock()
-	client := a.cigClient
-	a.mu.Unlock()
-	if client == nil {
-		return nil, fmt.Errorf("not connected — launch Star Citizen first")
-	}
-	return client.GetFriends(context.Background())
-}
-
-// GetReputation returns the player's reputation scores from CIG's API.
-func (a *App) GetReputation() ([]cigclient.ReputationScore, error) {
-	a.mu.Lock()
-	client := a.cigClient
-	a.mu.Unlock()
-	if client == nil {
-		return nil, fmt.Errorf("not connected — launch Star Citizen first")
-	}
-	return client.GetReputation(context.Background())
-}
-
-// GetBlueprints returns the player's blueprint collection from CIG's API.
-func (a *App) GetBlueprints() ([]cigclient.Blueprint, error) {
-	a.mu.Lock()
-	client := a.cigClient
-	a.mu.Unlock()
-	if client == nil {
-		return nil, fmt.Errorf("not connected — launch Star Citizen first")
-	}
-	return client.GetBlueprints(context.Background())
-}
-
-// GetEntitlements returns the player's entitlements from CIG's API.
-func (a *App) GetEntitlements() ([]cigclient.Entitlement, error) {
-	a.mu.Lock()
-	client := a.cigClient
-	a.mu.Unlock()
-	if client == nil {
-		return nil, fmt.Errorf("not connected — launch Star Citizen first")
-	}
-	return client.GetEntitlements(context.Background())
-}
-
-// GetActiveMissions returns the player's active missions from CIG's API.
-func (a *App) GetActiveMissions() ([]cigclient.Mission, error) {
-	a.mu.Lock()
-	client := a.cigClient
-	a.mu.Unlock()
-	if client == nil {
-		return nil, fmt.Errorf("not connected — launch Star Citizen first")
-	}
-	return client.GetActiveMissions(context.Background())
-}
-
-// GetStats returns the player's stats from CIG's API.
-func (a *App) GetStats() ([]cigclient.PlayerStat, error) {
-	a.mu.Lock()
-	client := a.cigClient
-	a.mu.Unlock()
-	if client == nil {
-		return nil, fmt.Errorf("not connected — launch Star Citizen first")
-	}
-	return client.GetStats(context.Background())
-}
-
-// IsGameConnected returns whether we have an active CIG API connection.
-func (a *App) IsGameConnected() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.cigClient != nil
-}
-
-// TestAllGrpc fetches all gRPC data types and publishes results to the event bus.
-// Called from the frontend debug UI to verify the CIG API is working.
-func (a *App) TestAllGrpc() string {
-	a.mu.Lock()
-	client := a.cigClient
-	a.mu.Unlock()
-	if client == nil {
-		return "not connected"
-	}
-
-	ctx := context.Background()
-	var results []string
-
-	// Wallet
-	if wallets, err := client.GetWallet(ctx); err != nil {
-		a.emitGrpcEvent("wallet_error", map[string]string{"error": err.Error()})
-		results = append(results, "wallet: ERROR "+err.Error())
-	} else {
-		data := map[string]string{"count": fmt.Sprintf("%d", len(wallets))}
-		for _, w := range wallets {
-			data[w.Currency] = fmt.Sprintf("%d", w.Amount)
-		}
-		a.emitGrpcEvent("wallet_data", data)
-		results = append(results, fmt.Sprintf("wallet: %d ledgers", len(wallets)))
-	}
-
-	// Friends (via ContactsService)
-	if friends, err := client.GetFriends(ctx); err != nil {
-		a.emitGrpcEvent("friends_error", map[string]string{"error": err.Error()})
-		results = append(results, "friends: ERROR "+err.Error())
-	} else {
-		online := 0
-		for _, f := range friends {
-			if f.Status == "activity" || f.Status == "online" {
-				online++
-			}
-		}
-		a.emitGrpcEvent("friends_data", map[string]string{
-			"total":  fmt.Sprintf("%d", len(friends)),
-			"online": fmt.Sprintf("%d", online),
-		})
-		results = append(results, fmt.Sprintf("friends: %d total, %d online/in-game", len(friends), online))
-	}
-
-	// Reputation
-	if scores, err := client.GetReputation(ctx); err != nil {
-		a.emitGrpcEvent("reputation_error", map[string]string{"error": err.Error()})
-		results = append(results, "reputation: ERROR "+err.Error())
-	} else {
-		data := map[string]string{"count": fmt.Sprintf("%d", len(scores))}
-		for _, s := range scores {
-			data[s.Scope] = fmt.Sprintf("%d (%s)", s.Score, s.StandingTier)
-		}
-		a.emitGrpcEvent("reputation_data", data)
-		results = append(results, fmt.Sprintf("reputation: %d scopes", len(scores)))
-	}
-
-	// Blueprints
-	if bps, err := client.GetBlueprints(ctx); err != nil {
-		a.emitGrpcEvent("blueprints_error", map[string]string{"error": err.Error()})
-		results = append(results, "blueprints: ERROR "+err.Error())
-	} else {
-		a.emitGrpcEvent("blueprints_data", map[string]string{
-			"count": fmt.Sprintf("%d", len(bps)),
-		})
-		results = append(results, fmt.Sprintf("blueprints: %d", len(bps)))
-	}
-
-	// Entitlements
-	if ents, err := client.GetEntitlements(ctx); err != nil {
-		a.emitGrpcEvent("entitlements_error", map[string]string{"error": err.Error()})
-		results = append(results, "entitlements: ERROR "+err.Error())
-	} else {
-		ships := 0
-		for _, e := range ents {
-			if e.ItemType == "SHIP" {
-				ships++
-			}
-		}
-		a.emitGrpcEvent("entitlements_data", map[string]string{
-			"total": fmt.Sprintf("%d", len(ents)),
-			"ships": fmt.Sprintf("%d", ships),
-		})
-		results = append(results, fmt.Sprintf("entitlements: %d total, %d ships", len(ents), ships))
-	}
-
-	// Missions
-	if missions, err := client.GetActiveMissions(ctx); err != nil {
-		a.emitGrpcEvent("missions_error", map[string]string{"error": err.Error()})
-		results = append(results, "missions: ERROR "+err.Error())
-	} else {
-		a.emitGrpcEvent("missions_data", map[string]string{
-			"count": fmt.Sprintf("%d", len(missions)),
-		})
-		results = append(results, fmt.Sprintf("missions: %d active", len(missions)))
-	}
-
-	// Stats
-	if stats, err := client.GetStats(ctx); err != nil {
-		a.emitGrpcEvent("stats_error", map[string]string{"error": err.Error()})
-		results = append(results, "stats: ERROR "+err.Error())
-	} else {
-		a.emitGrpcEvent("stats_data", map[string]string{
-			"count": fmt.Sprintf("%d", len(stats)),
-		})
-		results = append(results, fmt.Sprintf("stats: %d", len(stats)))
-	}
-
-	summary := strings.Join(results, " | ")
-	slog.Info("TestAllGrpc complete", "summary", summary)
-	return summary
-}
-
-// RawGrpcCall calls any gRPC method and returns the raw JSON response.
-// Used from the frontend debug UI to explore CIG's API.
-func (a *App) RawGrpcCall(method string, pageSize int) (string, error) {
-	a.mu.Lock()
-	client := a.cigClient
-	a.mu.Unlock()
-	if client == nil {
-		return "", fmt.Errorf("not connected")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	result, err := client.RawCall(ctx, method, pageSize)
-	if err != nil {
-		return "", err
-	}
-	return result, nil
-}
-
-// ListGrpcMethods returns all known gRPC method paths.
-func (a *App) ListGrpcMethods() []string {
-	a.mu.Lock()
-	client := a.cigClient
-	a.mu.Unlock()
-	if client == nil {
-		return nil
-	}
-	return client.MethodList()
-}
-
-func (a *App) emitGrpcEvent(eventType string, data map[string]string) {
-	a.bus.Publish(events.Event{
-		Type:      eventType,
-		Source:    "grpc",
-		Timestamp: time.Now(),
-		Data:      data,
-	})
 }

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import StatusBar from './components/StatusBar'
 import Dashboard from './components/Dashboard'
 import EventFeed from './components/EventFeed'
-import GrpcExplorer from './components/GrpcExplorer'
 import Settings from './components/Settings'
 
 // Wails runtime bindings
@@ -92,7 +91,6 @@ function App() {
       <nav className="app-nav" style={{ display: 'flex', alignItems: 'center', gap: 4, paddingTop: 8, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         {[
           { id: 'dashboard', label: 'Dashboard' },
-          { id: 'explorer', label: 'gRPC Explorer' },
           ...(debugMode ? [{ id: 'events', label: 'Event Feed' }] : []),
           { id: 'settings', label: 'Settings' },
         ].map(tab => (
@@ -148,7 +146,6 @@ function App() {
       {/* Content */}
       <main className="app-content" style={{ flex: 1, overflowY: 'auto' }}>
         {activeTab === 'dashboard' && <Dashboard status={status} />}
-        {activeTab === 'explorer' && <GrpcExplorer />}
         {activeTab === 'events' && <EventFeed events={events} />}
         {activeTab === 'settings' && <Settings config={config} />}
       </main>
