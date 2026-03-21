@@ -80,14 +80,19 @@ function EventFeed({ events }) {
         </span>
         <div className="flex-1" />
 
-        <div className="relative">
-          <Filter size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-600" />
+        <div style={{ position: 'relative' }}>
+          <Filter size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#4b5563', pointerEvents: 'none' }} />
           <input
             type="text"
             placeholder="Filter..."
             value={filter}
             onChange={e => setFilter(e.target.value)}
-            className="w-40 pl-7 pr-3 py-1.5 text-xs font-[family-name:var(--font-mono)] bg-white/[0.03] border border-white/[0.06] rounded-lg text-gray-300 placeholder-gray-600 focus:outline-none focus:border-sc-accent/30"
+            style={{
+              width: 160, paddingLeft: 30, paddingRight: 12, paddingTop: 6, paddingBottom: 6,
+              fontSize: 12, fontFamily: 'var(--font-mono)',
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 8, color: '#d1d5db', outline: 'none',
+            }}
           />
         </div>
 

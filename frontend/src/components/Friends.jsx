@@ -139,14 +139,19 @@ function Friends({ config }) {
       </div>
 
       {/* Search */}
-      <div className="relative" style={{ marginBottom: 10 }}>
-        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+      <div style={{ position: 'relative', marginBottom: 10 }}>
+        <Search size={13} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#4b5563', pointerEvents: 'none' }} />
         <input
           type="text"
           placeholder="Search friends..."
           value={filter}
           onChange={e => setFilter(e.target.value)}
-          className="w-full pl-8 pr-3 py-2 text-sm font-[family-name:var(--font-body)] bg-white/[0.03] border border-white/[0.06] rounded-lg text-gray-300 placeholder-gray-600 focus:outline-none focus:border-sc-accent/30"
+          style={{
+            width: '100%', paddingLeft: 34, paddingRight: 12, paddingTop: 8, paddingBottom: 8,
+            fontSize: 14, fontFamily: 'var(--font-body)',
+            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 8, color: '#d1d5db', outline: 'none',
+          }}
         />
       </div>
 
