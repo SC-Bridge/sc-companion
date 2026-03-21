@@ -568,99 +568,148 @@ func (c *Client) GetBlueprints(ctx context.Context) ([]Blueprint, error) {
 	return blueprints, nil
 }
 
-// GetEntitlements returns the player's entitlements (ships, items).
+// GetEntitlements returns all of the player's entitlements, paginating through all pages.
 func (c *Client) GetEntitlements(ctx context.Context) ([]Entitlement, error) {
-	resp, err := c.call(ctx, "/sc.external.services.entitlement.v1.ExternalEntitlementService/Query", func(req *dynamicpb.Message) {
-		SetQueryPagination(req, "query", 500)
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	jsonBytes, _ := protojson.Marshal(resp)
-	slog.Info("EntitlementService/Query response", "json", string(jsonBytes))
-
 	entitlementTypes := []string{"UNSPECIFIED", "PERMANENT", "RENTAL"}
 	entitlementStatuses := []string{"UNSPECIFIED", "PENDING", "FULFILLED", "REVOKED", "UNCLAIMED", "FAILED"}
 	entitlementSources := []string{"UNSPECIFIED", "PLATFORM", "ARENA_COMMANDER", "STAR_MARINE", "PERSISTENT_UNIVERSE", "LONGTERM_PERSISTENCE"}
 	entitlementItemTypes := []string{"UNSPECIFIED", "SHIP", "HANGAR", "HANGAR_DECORATION", "OTHER"}
 
-	var entitlements []Entitlement
-	resultsField := resp.Descriptor().Fields().ByName("results")
-	if resultsField == nil {
-		return entitlements, nil
-	}
+	var allEntitlements []Entitlement
+	cursor := ""
+	pageNum := 0
+	const pageSize = 500
+	const maxPages = 10 // safety limit
 
-	list := resp.Get(resultsField).List()
-	for i := 0; i < list.Len(); i++ {
-		e := list.Get(i).Message()
-
-		urn := e.Get(e.Descriptor().Fields().ByName("urn")).String()
-		name := e.Get(e.Descriptor().Fields().ByName("name")).String()
-		entityClassGUID := e.Get(e.Descriptor().Fields().ByName("entity_class_guid")).String()
-
-		typeNum := int(e.Get(e.Descriptor().Fields().ByName("type")).Enum())
-		eType := "PERMANENT"
-		if typeNum >= 0 && typeNum < len(entitlementTypes) {
-			eType = entitlementTypes[typeNum]
-		}
-
-		statusNum := int(e.Get(e.Descriptor().Fields().ByName("status")).Enum())
-		eStatus := "UNSPECIFIED"
-		if statusNum >= 0 && statusNum < len(entitlementStatuses) {
-			eStatus = entitlementStatuses[statusNum]
-		}
-
-		sourceNum := int(e.Get(e.Descriptor().Fields().ByName("source")).Enum())
-		eSource := "UNSPECIFIED"
-		if sourceNum >= 0 && sourceNum < len(entitlementSources) {
-			eSource = entitlementSources[sourceNum]
-		}
-
-		itemTypeNum := int(e.Get(e.Descriptor().Fields().ByName("item_type")).Enum())
-		eItemType := "UNSPECIFIED"
-		if itemTypeNum >= 0 && itemTypeNum < len(entitlementItemTypes) {
-			eItemType = entitlementItemTypes[itemTypeNum]
-		}
-
-		// Extract insurance info
-		isLifetime := false
-		var duration uint64
-		insuranceField := e.Descriptor().Fields().ByName("insurance")
-		if insuranceField != nil && e.Has(insuranceField) {
-			insurance := e.Get(insuranceField).Message()
-			policyField := insurance.Descriptor().Fields().ByName("policy")
-			if policyField != nil && insurance.Has(policyField) {
-				policy := insurance.Get(policyField).Message()
-				lifetimeField := policy.Descriptor().Fields().ByName("lifetime")
-				if lifetimeField != nil && policy.Has(lifetimeField) {
-					isLifetime = true
+	for pageNum < maxPages {
+		resp, err := c.call(ctx, "/sc.external.services.entitlement.v1.ExternalEntitlementService/Query", func(req *dynamicpb.Message) {
+			queryField := req.Descriptor().Fields().ByName("query")
+			if queryField == nil {
+				return
+			}
+			queryMsg := dynamicpb.NewMessage(queryField.Message())
+			paginationField := queryMsg.Descriptor().Fields().ByName("pagination")
+			if paginationField == nil {
+				return
+			}
+			paginationMsg := dynamicpb.NewMessage(paginationField.Message())
+			firstField := paginationMsg.Descriptor().Fields().ByName("first")
+			if firstField != nil {
+				paginationMsg.Set(firstField, protoreflect.ValueOfUint32(pageSize))
+			}
+			if cursor != "" {
+				afterField := paginationMsg.Descriptor().Fields().ByName("after")
+				if afterField != nil {
+					paginationMsg.Set(afterField, protoreflect.ValueOfString(cursor))
 				}
-				durationField := policy.Descriptor().Fields().ByName("duration")
-				if durationField != nil && policy.Has(durationField) {
-					dur := policy.Get(durationField).Message()
-					expiresField := dur.Descriptor().Fields().ByName("expires_at")
-					if expiresField != nil {
-						duration = dur.Get(expiresField).Uint()
+			}
+			queryMsg.Set(paginationField, protoreflect.ValueOfMessage(paginationMsg))
+			req.Set(queryField, protoreflect.ValueOfMessage(queryMsg))
+		})
+		if err != nil {
+			return allEntitlements, err
+		}
+
+		resultsField := resp.Descriptor().Fields().ByName("results")
+		if resultsField == nil {
+			break
+		}
+
+		list := resp.Get(resultsField).List()
+		if list.Len() == 0 {
+			break
+		}
+
+		for i := 0; i < list.Len(); i++ {
+			e := list.Get(i).Message()
+
+			urn := e.Get(e.Descriptor().Fields().ByName("urn")).String()
+			name := e.Get(e.Descriptor().Fields().ByName("name")).String()
+			entityClassGUID := e.Get(e.Descriptor().Fields().ByName("entity_class_guid")).String()
+
+			typeNum := int(e.Get(e.Descriptor().Fields().ByName("type")).Enum())
+			eType := "PERMANENT"
+			if typeNum >= 0 && typeNum < len(entitlementTypes) {
+				eType = entitlementTypes[typeNum]
+			}
+
+			statusNum := int(e.Get(e.Descriptor().Fields().ByName("status")).Enum())
+			eStatus := "UNSPECIFIED"
+			if statusNum >= 0 && statusNum < len(entitlementStatuses) {
+				eStatus = entitlementStatuses[statusNum]
+			}
+
+			sourceNum := int(e.Get(e.Descriptor().Fields().ByName("source")).Enum())
+			eSource := "UNSPECIFIED"
+			if sourceNum >= 0 && sourceNum < len(entitlementSources) {
+				eSource = entitlementSources[sourceNum]
+			}
+
+			itemTypeNum := int(e.Get(e.Descriptor().Fields().ByName("item_type")).Enum())
+			eItemType := "UNSPECIFIED"
+			if itemTypeNum >= 0 && itemTypeNum < len(entitlementItemTypes) {
+				eItemType = entitlementItemTypes[itemTypeNum]
+			}
+
+			// Extract insurance info
+			isLifetime := false
+			var duration uint64
+			insuranceField := e.Descriptor().Fields().ByName("insurance")
+			if insuranceField != nil && e.Has(insuranceField) {
+				insurance := e.Get(insuranceField).Message()
+				policyField := insurance.Descriptor().Fields().ByName("policy")
+				if policyField != nil && insurance.Has(policyField) {
+					policy := insurance.Get(policyField).Message()
+					lifetimeField := policy.Descriptor().Fields().ByName("lifetime")
+					if lifetimeField != nil && policy.Has(lifetimeField) {
+						isLifetime = true
+					}
+					durationField := policy.Descriptor().Fields().ByName("duration")
+					if durationField != nil && policy.Has(durationField) {
+						dur := policy.Get(durationField).Message()
+						expiresField := dur.Descriptor().Fields().ByName("expires_at")
+						if expiresField != nil {
+							duration = dur.Get(expiresField).Uint()
+						}
 					}
 				}
 			}
+
+			allEntitlements = append(allEntitlements, Entitlement{
+				URN:               urn,
+				Name:              name,
+				EntityClassGUID:   entityClassGUID,
+				EntitlementType:   eType,
+				Status:            eStatus,
+				ItemType:          eItemType,
+				Source:            eSource,
+				InsuranceLifetime: isLifetime,
+				InsuranceDuration: duration,
+			})
 		}
 
-		entitlements = append(entitlements, Entitlement{
-			URN:               urn,
-			Name:              name,
-			EntityClassGUID:   entityClassGUID,
-			EntitlementType:   eType,
-			Status:            eStatus,
-			ItemType:          eItemType,
-			Source:            eSource,
-			InsuranceLifetime: isLifetime,
-			InsuranceDuration: duration,
-		})
+		// Check for next page
+		pageInfoField := resp.Descriptor().Fields().ByName("page_info")
+		if pageInfoField == nil || !resp.Has(pageInfoField) {
+			break
+		}
+		pageInfo := resp.Get(pageInfoField).Message()
+		hasNextField := pageInfo.Descriptor().Fields().ByName("has_next_page")
+		if hasNextField == nil || !pageInfo.Get(hasNextField).Bool() {
+			break
+		}
+		endCursorField := pageInfo.Descriptor().Fields().ByName("end_cursor")
+		if endCursorField == nil {
+			break
+		}
+		cursor = pageInfo.Get(endCursorField).String()
+		pageNum++
+
+		slog.Info("entitlements pagination", "page", pageNum, "fetched", len(allEntitlements), "cursor", cursor)
 	}
 
-	return entitlements, nil
+	slog.Info("entitlements complete", "total", len(allEntitlements))
+	return allEntitlements, nil
 }
 
 // GetActiveMissions returns active missions (2-step: get IDs, then details).
