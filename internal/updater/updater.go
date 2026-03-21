@@ -16,12 +16,13 @@ const (
 
 // ReleaseInfo contains version info from GitHub Releases.
 type ReleaseInfo struct {
-	Version     string `json:"version"`
-	Name        string `json:"name"`
-	URL         string `json:"url"`
-	DownloadURL string `json:"downloadUrl"`
-	PublishedAt string `json:"publishedAt"`
-	HasUpdate   bool   `json:"hasUpdate"`
+	Version        string `json:"version"`
+	Name           string `json:"name"`
+	URL            string `json:"url"`
+	DownloadURL    string `json:"downloadUrl"`
+	InstallerURL   string `json:"installerUrl"`
+	PublishedAt    string `json:"publishedAt"`
+	HasUpdate      bool   `json:"hasUpdate"`
 }
 
 type ghRelease struct {
@@ -70,29 +71,23 @@ func CheckForUpdate(currentVersion string) (*ReleaseInfo, error) {
 
 	latestVersion := strings.TrimPrefix(release.TagName, "v")
 
-	// Find the Windows zip asset
-	var downloadURL string
+	// Find release assets
+	var downloadURL, installerURL string
 	for _, asset := range release.Assets {
-		if strings.Contains(asset.Name, "windows") && strings.HasSuffix(asset.Name, ".zip") {
+		if strings.HasSuffix(asset.Name, "-portable.zip") {
 			downloadURL = asset.BrowserDownloadURL
-			break
 		}
-	}
-	// Fall back to installer
-	if downloadURL == "" {
-		for _, asset := range release.Assets {
-			if strings.HasSuffix(asset.Name, "-installer.exe") {
-				downloadURL = asset.BrowserDownloadURL
-				break
-			}
+		if strings.HasSuffix(asset.Name, "-setup.msi") {
+			installerURL = asset.BrowserDownloadURL
 		}
 	}
 
 	return &ReleaseInfo{
-		Version:     latestVersion,
-		Name:        release.Name,
-		URL:         release.HTMLURL,
-		DownloadURL: downloadURL,
+		Version:        latestVersion,
+		Name:           release.Name,
+		URL:            release.HTMLURL,
+		DownloadURL:    downloadURL,
+		InstallerURL:   installerURL,
 		PublishedAt: release.PublishedAt.Format(time.RFC3339),
 		HasUpdate:   compareVersions(latestVersion, currentVersion),
 	}, nil

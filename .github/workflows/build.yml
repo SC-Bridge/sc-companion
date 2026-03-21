@@ -38,19 +38,31 @@ jobs:
           npm ci
 
       - name: Build Windows executable
-        run: wails build -platform windows/amd64 -nsis -ldflags "-X main.Version=${{ steps.version.outputs.VERSION }}"
+        run: wails build -platform windows/amd64 -ldflags "-X main.Version=${{ steps.version.outputs.VERSION }}"
 
-      - name: Create release zip
+      # Portable zip
+      - name: Create portable zip
         shell: pwsh
         run: |
-          Compress-Archive -Path "build\bin\SCBridgeCompanion.exe" -DestinationPath "SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-windows-amd64.zip"
+          Compress-Archive -Path "build\bin\SCBridgeCompanion.exe" -DestinationPath "SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-windows-portable.zip"
+
+      # MSI installer via WiX v4
+      - name: Install WiX Toolset
+        run: dotnet tool install --global wix
+
+      - name: Build MSI installer
+        shell: pwsh
+        run: |
+          Copy-Item "build\bin\SCBridgeCompanion.exe" "installer\SCBridgeCompanion.exe"
+          cd installer
+          wix build installer.wxs -o "..\SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-setup.msi" -arch x64
 
       - name: Upload release artifacts
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-windows-amd64.zip
-            build/bin/SCBridgeCompanion-amd64-installer.exe
+            SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-windows-portable.zip
+            SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-setup.msi
           generate_release_notes: true
           draft: false
         env:
