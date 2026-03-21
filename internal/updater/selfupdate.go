@@ -78,45 +78,16 @@ func ApplyUpdate(downloadURL string, quitFn func()) error {
 
 	slog.Info("self-update: downloaded", "path", newExePath)
 
-	// Write a VBScript wrapper that runs the batch script completely hidden
-	// (no cmd window visible at all)
-	batPath := filepath.Join(tmpDir, "scbridge-update.bat")
-	batContent := fmt.Sprintf(`@echo off
-timeout /t 2 /nobreak >nul
-copy /Y "%s" "%s" >nul
-if errorlevel 1 (
-    del "%s"
-    exit /b 1
-)
-del "%s"
-start "" "%s"
-del "%%~f0"
-`, newExePath, currentExe, newExePath, newExePath, currentExe)
+	// Use PowerShell to wait, replace, and relaunch — completely hidden
+	psScript := fmt.Sprintf(
+		`Start-Sleep -Seconds 2; Copy-Item -Force '%s' '%s'; Remove-Item -Force '%s'; Start-Process '%s'`,
+		newExePath, currentExe, newExePath, currentExe,
+	)
 
-	if err := os.WriteFile(batPath, []byte(batContent), 0700); err != nil {
-		os.Remove(newExePath)
-		return fmt.Errorf("write update script: %w", err)
-	}
-
-	// Use a VBScript to launch the batch file invisibly
-	vbsPath := filepath.Join(tmpDir, "scbridge-update.vbs")
-	vbsContent := fmt.Sprintf(`Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run """%s""", 0, False
-`, batPath)
-
-	if err := os.WriteFile(vbsPath, []byte(vbsContent), 0700); err != nil {
-		os.Remove(newExePath)
-		os.Remove(batPath)
-		return fmt.Errorf("write vbs launcher: %w", err)
-	}
-
-	// Launch via wscript.exe (always available on Windows, no window)
-	cmd := exec.Command("wscript.exe", vbsPath)
+	cmd := exec.Command("powershell.exe", "-WindowStyle", "Hidden", "-Command", psScript)
 	cmd.Dir = tmpDir
 	if err := cmd.Start(); err != nil {
 		os.Remove(newExePath)
-		os.Remove(batPath)
-		os.Remove(vbsPath)
 		return fmt.Errorf("launch update script: %w", err)
 	}
 
