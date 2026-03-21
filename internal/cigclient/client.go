@@ -153,9 +153,8 @@ func NewClient(ld *LoginData) (*Client, error) {
 
 // Connect establishes the gRPC connection.
 func (c *Client) Connect(ctx context.Context) error {
+	// Set conn under lock, then release before calling getJWT (which also locks)
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if c.conn != nil {
 		c.conn.Close()
 	}
@@ -178,12 +177,15 @@ func (c *Client) Connect(ctx context.Context) error {
 		grpc.WithBlock(),
 	)
 	if err != nil {
+		c.mu.Unlock()
 		return fmt.Errorf("dial CIG: %w", err)
 	}
 	c.conn = cc
+	c.mu.Unlock()
 	slog.Info("gRPC connection established")
 
 	// Get the proper JWT via GetCurrentPlayer (with timeout)
+	// NOTE: getJWT → call() takes c.mu internally, so we must NOT hold it here
 	jwtCtx, jwtCancel := context.WithTimeout(ctx, 15*time.Second)
 	defer jwtCancel()
 
@@ -193,7 +195,9 @@ func (c *Client) Connect(ctx context.Context) error {
 		slog.Warn("failed to get JWT, using auth_token directly", "error", err)
 		// Fall back to using auth_token directly
 	} else {
+		c.mu.Lock()
 		c.token = jwt
+		c.mu.Unlock()
 		slog.Info("got JWT from IdentityService")
 	}
 
