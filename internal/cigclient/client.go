@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -158,6 +159,8 @@ func (c *Client) Connect(ctx context.Context) error {
 		c.conn.Close()
 	}
 
+	slog.Info("connecting to CIG endpoint", "endpoint", c.endpoint)
+
 	cc, err := grpc.NewClient(
 		c.endpoint,
 		grpc.WithTransportCredentials(credentials.NewTLS(nil)),
@@ -167,8 +170,12 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 	c.conn = cc
 
-	// Get the proper JWT via GetCurrentPlayer
-	jwt, err := c.getJWT(ctx)
+	// Get the proper JWT via GetCurrentPlayer (with timeout)
+	jwtCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	slog.Info("requesting JWT from IdentityService...")
+	jwt, err := c.getJWT(jwtCtx)
 	if err != nil {
 		slog.Warn("failed to get JWT, using auth_token directly", "error", err)
 		// Fall back to using auth_token directly
@@ -810,6 +817,13 @@ func (c *Client) call(ctx context.Context, method string, setFields func(*dynami
 	reqBytes, err := proto.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	// Ensure a timeout exists — default 30s if none set
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
 	}
 
 	// Create outgoing context with auth
