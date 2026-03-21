@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -159,10 +160,15 @@ func (c *Client) Connect(ctx context.Context) error {
 		c.conn.Close()
 	}
 
-	slog.Info("connecting to CIG endpoint", "endpoint", c.endpoint)
+	// gRPC expects host:port, not a URL — strip https:// prefix
+	target := c.endpoint
+	target = strings.TrimPrefix(target, "https://")
+	target = strings.TrimPrefix(target, "http://")
+
+	slog.Info("connecting to CIG endpoint", "target", target)
 
 	cc, err := grpc.NewClient(
-		c.endpoint,
+		target,
 		grpc.WithTransportCredentials(credentials.NewTLS(nil)),
 	)
 	if err != nil {
