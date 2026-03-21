@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -234,7 +235,7 @@ func (c *Client) GetWallet(ctx context.Context) ([]WalletBalance, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshal response: %w", err)
 	}
-	slog.Debug("GetFunds response", "json", string(jsonBytes))
+	slog.Info("GetFunds response", "json", string(jsonBytes))
 
 	// Extract ledgers from response
 	var wallets []WalletBalance
@@ -283,7 +284,7 @@ func (c *Client) GetFriends(ctx context.Context) ([]Friend, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshal response: %w", err)
 	}
-	slog.Debug("GetFriendList response", "json", string(jsonBytes))
+	slog.Info("GetFriendList response", "json", string(jsonBytes))
 
 	var friends []Friend
 	friendsField := resp.Descriptor().Fields().ByName("friends")
@@ -345,14 +346,14 @@ func (c *Client) GetFriends(ctx context.Context) ([]Friend, error) {
 // GetReputation returns the player's reputation scores across all factions.
 func (c *Client) GetReputation(ctx context.Context) ([]ReputationScore, error) {
 	resp, err := c.call(ctx, "/sc.external.services.reputation.v1.ReputationService/QueryReputations", func(req *dynamicpb.Message) {
-		setQueryPagination(req, "query", 200)
+		SetQueryPagination(req, "query", 200)
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	jsonBytes, _ := protojson.Marshal(resp)
-	slog.Debug("QueryReputations response", "json", string(jsonBytes))
+	slog.Info("QueryReputations response", "json", string(jsonBytes))
 
 	var scores []ReputationScore
 	resultsField := resp.Descriptor().Fields().ByName("results")
@@ -442,7 +443,7 @@ func (c *Client) GetReputationHistory(ctx context.Context, reputationIDs []strin
 	}
 
 	jsonBytes, _ := protojson.Marshal(resp)
-	slog.Debug("GetScoreHistory response", "json", string(jsonBytes))
+	slog.Info("GetScoreHistory response", "json", string(jsonBytes))
 
 	var entries []ReputationHistoryEntry
 	resultsField := resp.Descriptor().Fields().ByName("reputation_scores")
@@ -474,8 +475,8 @@ func (c *Client) GetReputationHistory(ctx context.Context, reputationIDs []strin
 	return entries, nil
 }
 
-// setQueryPagination sets query.pagination.first on a request message that has a "query" field.
-func setQueryPagination(req *dynamicpb.Message, fieldName string, pageSize uint32) {
+// SetQueryPagination sets query.pagination.first on a request message that has a "query" field.
+func SetQueryPagination(req *dynamicpb.Message, fieldName string, pageSize uint32) {
 	queryField := req.Descriptor().Fields().ByName(protoreflect.Name(fieldName))
 	if queryField == nil {
 		slog.Warn("no query field on request", "field", fieldName)
@@ -502,14 +503,14 @@ func setQueryPagination(req *dynamicpb.Message, fieldName string, pageSize uint3
 // GetBlueprints returns the player's blueprint collection.
 func (c *Client) GetBlueprints(ctx context.Context) ([]Blueprint, error) {
 	resp, err := c.call(ctx, "/sc.external.services.blueprint_library.v1.BlueprintLibraryService/QueryBlueprintEntries", func(req *dynamicpb.Message) {
-		setQueryPagination(req, "query", 500)
+		SetQueryPagination(req, "query", 500)
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	jsonBytes, _ := protojson.Marshal(resp)
-	slog.Debug("QueryBlueprintEntries response", "json", string(jsonBytes))
+	slog.Info("QueryBlueprintEntries response", "json", string(jsonBytes))
 
 	blueprintSources := []string{"UNSPECIFIED", "GAMEPLAY", "PLATFORM"}
 	blueprintProcessTypes := []string{"UNSPECIFIED", "CREATE", "REFINE", "REPAIR", "UPGRADE", "DISMANTLE", "RESEARCH"}
@@ -559,14 +560,14 @@ func (c *Client) GetBlueprints(ctx context.Context) ([]Blueprint, error) {
 // GetEntitlements returns the player's entitlements (ships, items).
 func (c *Client) GetEntitlements(ctx context.Context) ([]Entitlement, error) {
 	resp, err := c.call(ctx, "/sc.external.services.entitlement.v1.ExternalEntitlementService/Query", func(req *dynamicpb.Message) {
-		setQueryPagination(req, "query", 500)
+		SetQueryPagination(req, "query", 500)
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	jsonBytes, _ := protojson.Marshal(resp)
-	slog.Debug("EntitlementService/Query response", "json", string(jsonBytes))
+	slog.Info("EntitlementService/Query response", "json", string(jsonBytes))
 
 	entitlementTypes := []string{"UNSPECIFIED", "PERMANENT", "RENTAL"}
 	entitlementStatuses := []string{"UNSPECIFIED", "PENDING", "FULFILLED", "REVOKED", "UNCLAIMED", "FAILED"}
@@ -701,7 +702,7 @@ func (c *Client) GetActiveMissions(ctx context.Context) ([]Mission, error) {
 	}
 
 	jsonBytes, _ := protojson.Marshal(detailResp)
-	slog.Debug("QueryMissions response", "json", string(jsonBytes))
+	slog.Info("QueryMissions response", "json", string(jsonBytes))
 
 	missionStates := []string{"UNSPECIFIED", "PENDING", "ACTIVE", "SUSPENDED", "COMPLETED", "FAILED", "EXPIRED", "ENDED", "WITHDRAWN"}
 
@@ -806,14 +807,14 @@ func (c *Client) GetActiveMissions(ctx context.Context) ([]Mission, error) {
 // GetStats returns the player's stats.
 func (c *Client) GetStats(ctx context.Context) ([]PlayerStat, error) {
 	resp, err := c.call(ctx, "/sc.external.services.stats.v1.StatsService/FindStats", func(req *dynamicpb.Message) {
-		setQueryPagination(req, "query", 500)
+		SetQueryPagination(req, "query", 500)
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	jsonBytes, _ := protojson.Marshal(resp)
-	slog.Debug("FindStats response", "json", string(jsonBytes))
+	slog.Info("FindStats response", "json", string(jsonBytes))
 
 	var stats []PlayerStat
 	resultsField := resp.Descriptor().Fields().ByName("results")
@@ -913,6 +914,42 @@ func (c *Client) call(ctx context.Context, method string, setFields func(*dynami
 		)
 		return nil, fmt.Errorf("invoke %s: %w", method, ctx.Err())
 	}
+}
+
+// Call is the exported version of call for use from app.go.
+func (c *Client) Call(ctx context.Context, method string, setFields func(*dynamicpb.Message)) (*dynamicpb.Message, error) {
+	return c.call(ctx, method, setFields)
+}
+
+// RawCall calls a method and returns the response as a JSON string.
+func (c *Client) RawCall(ctx context.Context, method string, pageSize int) (string, error) {
+	var setFields func(*dynamicpb.Message)
+	if pageSize > 0 {
+		setFields = func(req *dynamicpb.Message) {
+			SetQueryPagination(req, "query", uint32(pageSize))
+		}
+	}
+
+	resp, err := c.call(ctx, method, setFields)
+	if err != nil {
+		return "", err
+	}
+
+	jsonBytes, err := protojson.Marshal(resp)
+	if err != nil {
+		return "", fmt.Errorf("marshal: %w", err)
+	}
+	return string(jsonBytes), nil
+}
+
+// MethodList returns all known gRPC method paths.
+func (c *Client) MethodList() []string {
+	paths := make([]string, 0, len(c.methods))
+	for k := range c.methods {
+		paths = append(paths, k)
+	}
+	sort.Strings(paths)
+	return paths
 }
 
 // Close shuts down the connection.

@@ -557,6 +557,37 @@ func (a *App) TestAllGrpc() string {
 	return summary
 }
 
+// RawGrpcCall calls any gRPC method and returns the raw JSON response.
+// Used from the frontend debug UI to explore CIG's API.
+func (a *App) RawGrpcCall(method string, pageSize int) (string, error) {
+	a.mu.Lock()
+	client := a.cigClient
+	a.mu.Unlock()
+	if client == nil {
+		return "", fmt.Errorf("not connected")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	result, err := client.RawCall(ctx, method, pageSize)
+	if err != nil {
+		return "", err
+	}
+	return result, nil
+}
+
+// ListGrpcMethods returns all known gRPC method paths.
+func (a *App) ListGrpcMethods() []string {
+	a.mu.Lock()
+	client := a.cigClient
+	a.mu.Unlock()
+	if client == nil {
+		return nil
+	}
+	return client.MethodList()
+}
+
 func (a *App) emitGrpcEvent(eventType string, data map[string]string) {
 	a.bus.Publish(events.Event{
 		Type:      eventType,
