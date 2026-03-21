@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Settings as SettingsIcon, FolderOpen, Globe, Link, Unlink, RotateCcw, ChevronDown, ChevronRight, RefreshCw, Download } from 'lucide-react'
+import { Settings as SettingsIcon, FolderOpen, Globe, Link, Unlink, RotateCcw, ChevronDown, ChevronRight, RefreshCw, Download, Database, FileText } from 'lucide-react'
 
 const wails = window.go?.main?.App
 
@@ -11,12 +11,16 @@ function Settings({ config, onConfigChange }) {
   const [version, setVersion] = useState('')
   const [checkingUpdate, setCheckingUpdate] = useState(false)
   const [updateResult, setUpdateResult] = useState(null)
+  const [eventLogPath, setEventLogPath] = useState('')
+  const [dbPath, setDbPath] = useState('')
 
   useEffect(() => {
     if (!wails) return
     wails.GetEventCategories().then(setCategories).catch(console.error)
     wails.GetSyncPreferences().then(setSyncPrefs).catch(console.error)
     wails.GetVersion().then(setVersion).catch(console.error)
+    wails.GetEventLogPath().then(setEventLogPath).catch(console.error)
+    wails.GetDatabasePath().then(setDbPath).catch(console.error)
   }, [])
 
   const checkForUpdate = useCallback(async () => {
@@ -202,17 +206,28 @@ function Settings({ config, onConfigChange }) {
       </Section>
 
       {/* Data Sources */}
-      <Section title="Data Sources">
-        <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <FolderOpen size={20} style={{ color: '#5b9bd5', flexShrink: 0 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, color: '#d1d5db' }}>Game.log Path</div>
-            <div style={{ fontSize: 12, color: '#4b5563', marginTop: 1 }}>Path to Star Citizen Game.log file.</div>
-          </div>
-          <span className="font-[family-name:var(--font-mono)]" style={{ fontSize: 12, color: '#6b7280', flexShrink: 0 }}>
-            {config.logPath || 'Auto-detect'}
-          </span>
-        </div>
+      <Section title="Data & Files">
+        <FileRow
+          icon={FolderOpen}
+          label="Game.log"
+          description="Star Citizen game log (input)"
+          path={config.logPath || 'Auto-detect'}
+          onReveal={config.logPath ? () => wails?.OpenInExplorer(config.logPath) : null}
+        />
+        <FileRow
+          icon={FileText}
+          label="Event Log"
+          description="JSONL event log (for WingmanAI)"
+          path={eventLogPath}
+          onReveal={() => wails?.OpenInExplorer(eventLogPath)}
+        />
+        <FileRow
+          icon={Database}
+          label="Database"
+          description="Local SQLite event store"
+          path={dbPath}
+          onReveal={() => wails?.OpenInExplorer(dbPath)}
+        />
       </Section>
 
       {/* About */}
@@ -277,6 +292,34 @@ function Section({ title, children }) {
         </h3>
       </div>
       {children}
+    </div>
+  )
+}
+
+function FileRow({ icon: Icon, label, description, path, onReveal }) {
+  return (
+    <div
+      onClick={onReveal || undefined}
+      style={{
+        padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
+        borderBottom: '1px solid rgba(255,255,255,0.04)',
+        cursor: onReveal ? 'pointer' : 'default',
+        transition: 'background 0.15s',
+      }}
+      onMouseEnter={(e) => { if (onReveal) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+    >
+      <Icon size={18} style={{ color: '#5b9bd5', flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, color: '#d1d5db' }}>{label}</div>
+        <div style={{ fontSize: 11, color: '#4b5563', marginTop: 1 }}>{description}</div>
+      </div>
+      <span className="font-[family-name:var(--font-mono)]" style={{
+        fontSize: 11, color: '#6b7280', flexShrink: 0, maxWidth: 280,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {path || '—'}
+      </span>
     </div>
   )
 }

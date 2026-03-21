@@ -6,11 +6,13 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"sync"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	wailsrt "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/SC-Bridge/sc-companion/internal/auth"
 	"github.com/SC-Bridge/sc-companion/internal/updater"
@@ -204,7 +206,7 @@ func (a *App) startup(ctx context.Context) {
 		a.eventsMu.Unlock()
 
 		// Always emit to frontend
-		runtime.EventsEmit(a.ctx, "event", entry)
+		wailsrt.EventsEmit(a.ctx, "event", entry)
 
 		slog.Debug("event", "type", merged.Type, "data", merged.Data)
 	})
@@ -252,7 +254,7 @@ func (a *App) startSync(ctx context.Context) {
 	client := storesync.NewClient(endpoint, a.authInfo.SessionToken, a.db)
 	client.SetSyncCheck(a.syncPrefs.IsEnabled)
 	client.SetOnAuthExpired(func() {
-		runtime.EventsEmit(a.ctx, "auth_expired", nil)
+		wailsrt.EventsEmit(a.ctx, "auth_expired", nil)
 	})
 
 	syncCtx, syncCancel := context.WithCancel(ctx)
@@ -353,6 +355,37 @@ func (a *App) GetTotalEvents() int {
 // GetEventLogPath returns the path to the JSONL event log file.
 func (a *App) GetEventLogPath() string {
 	return filepath.Join(config.DataDir(), "events.log")
+}
+
+// GetDatabasePath returns the path to the SQLite database.
+func (a *App) GetDatabasePath() string {
+	return filepath.Join(config.DataDir(), "companion.db")
+}
+
+// GetDataDir returns the application data directory.
+func (a *App) GetDataDir() string {
+	return config.DataDir()
+}
+
+// OpenInExplorer opens the containing folder of a file path in the OS file manager.
+func (a *App) OpenInExplorer(filePath string) {
+	dir := filepath.Dir(filePath)
+	if _, err := os.Stat(dir); err != nil {
+		slog.Error("directory not found", "path", dir)
+		return
+	}
+	var cmd *exec.Cmd
+	switch goruntime.GOOS {
+	case "windows":
+		cmd = exec.Command("explorer", "/select,", filePath)
+	case "darwin":
+		cmd = exec.Command("open", "-R", filePath)
+	default:
+		cmd = exec.Command("xdg-open", dir)
+	}
+	if err := cmd.Start(); err != nil {
+		slog.Error("failed to open explorer", "error", err)
+	}
 }
 
 // --- Environment switcher ---
@@ -489,7 +522,7 @@ func (a *App) ConnectToSCBridge() ConnectionStatus {
 
 	// Open browser
 	connectURL := flow.ConnectURL()
-	runtime.BrowserOpenURL(a.ctx, connectURL)
+	wailsrt.BrowserOpenURL(a.ctx, connectURL)
 
 	// Wait for callback (blocks up to 5 min)
 	result := flow.Start(a.ctx)
@@ -576,13 +609,13 @@ func (a *App) CheckForUpdate() *updater.ReleaseInfo {
 
 // OpenDownloadURL opens the download URL in the default browser.
 func (a *App) OpenDownloadURL(url string) {
-	runtime.BrowserOpenURL(a.ctx, url)
+	wailsrt.BrowserOpenURL(a.ctx, url)
 }
 
 // ApplyUpdate downloads the new version, replaces the exe, and restarts.
 func (a *App) ApplyUpdate(downloadURL string) string {
 	err := updater.ApplyUpdate(downloadURL, func() {
-		runtime.Quit(a.ctx)
+		wailsrt.Quit(a.ctx)
 	})
 	if err != nil {
 		slog.Error("self-update failed", "error", err)
