@@ -388,6 +388,27 @@ func (a *App) OpenInExplorer(filePath string) {
 	}
 }
 
+// BrowseGameLog opens a file dialog to select the Game.log path and saves it.
+func (a *App) BrowseGameLog() string {
+	selection, err := wailsrt.OpenFileDialog(a.ctx, wailsrt.OpenDialogOptions{
+		Title: "Select Game.log",
+		Filters: []wailsrt.FileFilter{
+			{DisplayName: "Log Files (*.log)", Pattern: "*.log"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil || selection == "" {
+		return ""
+	}
+
+	a.mu.Lock()
+	a.cfg.LogPath = selection
+	a.cfg.Save(a.cfgPath)
+	a.mu.Unlock()
+
+	return selection
+}
+
 // --- Environment switcher ---
 
 // GetEnvironment returns the current environment.

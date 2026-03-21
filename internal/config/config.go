@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -69,29 +70,94 @@ func Load(path string) (*Config, error) {
 	return cfg, nil
 }
 
-// DetectGameLog attempts to find Game.log in common SC install locations.
+// DetectGameLog attempts to find Game.log by scanning all available drives
+// and common install patterns. Returns the first match found, preferring
+// LIVE over PTU.
 func DetectGameLog() string {
 	if runtime.GOOS != "windows" {
 		return ""
 	}
 
-	// Common SC install drives
-	drives := []string{"C", "D", "E", "F"}
-	paths := []string{
-		`Program Files\Roberts Space Industries\StarCitizen\LIVE\Game.log`,
-		`Roberts Space Industries\StarCitizen\LIVE\Game.log`,
-		`Games\Roberts Space Industries\StarCitizen\LIVE\Game.log`,
-		`Program Files\Roberts Space Industries\StarCitizen\PTU\Game.log`,
-		`Roberts Space Industries\StarCitizen\PTU\Game.log`,
+	// Scan all drive letters A-Z
+	var drives []string
+	for d := 'C'; d <= 'Z'; d++ {
+		root := string(d) + `:\`
+		if _, err := os.Stat(root); err == nil {
+			drives = append(drives, string(d))
+		}
 	}
 
+	// Common install path patterns (relative to drive root)
+	// People install SC to wildly different locations
+	patterns := []string{
+		// Default RSI launcher locations
+		`Program Files\Roberts Space Industries\StarCitizen`,
+		`Roberts Space Industries\StarCitizen`,
+		// Common custom locations
+		`Games\Roberts Space Industries\StarCitizen`,
+		`Games\StarCitizen`,
+		`Star Citizen`,
+		`StarCitizen`,
+		`SC\StarCitizen`,
+		`RSI\StarCitizen`,
+	}
+
+	// Check LIVE first, then PTU, then EPTU
+	channels := []string{"LIVE", "PTU", "EPTU"}
+
 	for _, drive := range drives {
-		for _, p := range paths {
-			full := filepath.Join(drive+`:\`, p)
-			if _, err := os.Stat(full); err == nil {
-				return full
+		for _, pattern := range patterns {
+			for _, channel := range channels {
+				full := filepath.Join(drive+`:\`, pattern, channel, "Game.log")
+				if _, err := os.Stat(full); err == nil {
+					return full
+				}
 			}
 		}
 	}
+
+	// Last resort: recursive search for Game.log in StarCitizen directories
+	for _, drive := range drives {
+		for _, pattern := range patterns {
+			scDir := filepath.Join(drive+`:\`, pattern)
+			if _, err := os.Stat(scDir); err != nil {
+				continue
+			}
+			// Walk one level deep looking for Game.log
+			entries, err := os.ReadDir(scDir)
+			if err != nil {
+				continue
+			}
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					continue
+				}
+				candidate := filepath.Join(scDir, entry.Name(), "Game.log")
+				if _, err := os.Stat(candidate); err == nil {
+					return candidate
+				}
+			}
+		}
+	}
+
 	return ""
+}
+
+// DetectedLogPath returns the auto-detected path or empty string.
+// This is separate from DetectGameLog so we can show the detected path
+// to the user even when they've set a manual override.
+func DetectedLogPath() string {
+	return DetectGameLog()
+}
+
+// ValidateLogPath checks if the given path points to a readable file.
+func ValidateLogPath(path string) bool {
+	if path == "" {
+		return false
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return !info.IsDir() && strings.HasSuffix(strings.ToLower(info.Name()), ".log")
 }

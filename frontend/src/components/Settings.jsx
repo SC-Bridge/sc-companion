@@ -210,13 +210,47 @@ function Settings({ config, onConfigChange, onUpdateFound }) {
 
       {/* Data Sources */}
       <Section title="Data & Files">
-        <FileRow
-          icon={FolderOpen}
-          label="Game.log"
-          description="Star Citizen game log (input)"
-          path={config.logPath || 'Auto-detect'}
-          onReveal={config.logPath ? () => wails?.OpenInExplorer(config.logPath) : null}
-        />
+        <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <FolderOpen size={18} style={{ color: '#5b9bd5', flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, color: '#d1d5db' }}>Game.log</div>
+            <div className="font-[family-name:var(--font-mono)]" style={{
+              fontSize: 11, color: '#6b7280', marginTop: 2,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {config.logPath || 'Auto-detect'}
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              if (!wails) return
+              const path = await wails.BrowseGameLog()
+              if (path) {
+                const cfg = await wails.GetConfig()
+                onConfigChange(cfg)
+              }
+            }}
+            style={{
+              padding: '5px 10px', fontSize: 11, borderRadius: 6,
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+              color: '#9ca3af', cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            Browse
+          </button>
+          {config.logPath && (
+            <button
+              onClick={() => wails?.OpenInExplorer(config.logPath)}
+              style={{
+                padding: '5px 10px', fontSize: 11, borderRadius: 6,
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                color: '#9ca3af', cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              Reveal
+            </button>
+          )}
+        </div>
         <FileRow
           icon={FileText}
           label="Event Log"
