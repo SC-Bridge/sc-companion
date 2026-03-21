@@ -12,7 +12,6 @@ function Settings({ config, onConfigChange }) {
   const [checkingUpdate, setCheckingUpdate] = useState(false)
   const [updateResult, setUpdateResult] = useState(null)
 
-  // Load event categories, sync preferences, and version
   useEffect(() => {
     if (!wails) return
     wails.GetEventCategories().then(setCategories).catch(console.error)
@@ -71,94 +70,86 @@ function Settings({ config, onConfigChange }) {
 
   if (!config) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-600" style={{ maxWidth: 720, margin: '0 auto' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256, color: '#4b5563' }}>
         Loading settings...
       </div>
     )
   }
 
   return (
-    <div className="space-y-6" style={{ maxWidth: 720, margin: '0 auto' }}>
-      <div className="flex items-center gap-2 mb-4">
-        <SettingsIcon size={16} className="text-sc-accent" />
-        <h2 className="font-[family-name:var(--font-display)] text-sm tracking-wider text-gray-400 uppercase">
+    <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <SettingsIcon size={16} style={{ color: '#22d3ee' }} />
+        <h2 className="font-[family-name:var(--font-display)]" style={{ fontSize: 14, letterSpacing: '0.08em', color: '#9ca3af', textTransform: 'uppercase' }}>
           Settings
         </h2>
       </div>
 
-      {/* Section 1: SC Bridge Connection */}
-      <SettingsSection title="SC Bridge Connection">
+      {/* SC Bridge Connection */}
+      <Section title="SC Bridge Connection">
         {config.connected ? (
-          <div className="px-4 py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-sc-accent/10 flex items-center justify-center">
-                  <Link size={14} className="text-sc-accent" />
-                </div>
-                <div>
-                  <div className="text-sm text-gray-200">Connected</div>
-                  <div className="text-xs text-gray-500 font-[family-name:var(--font-mono)]">
-                    {config.handle || config.apiEndpoint}
-                  </div>
+          <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Link size={20} style={{ color: '#22d3ee', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 14, color: '#e5e7eb' }}>Connected</div>
+                <div className="font-[family-name:var(--font-mono)]" style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>
+                  {config.handle || config.apiEndpoint}
                 </div>
               </div>
-              <button
-                onClick={handleDisconnect}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all"
-                style={{
-                  background: 'rgba(239,68,68,0.1)',
-                  border: '1px solid rgba(239,68,68,0.2)',
-                  color: '#ef4444',
-                  cursor: 'pointer',
-                }}
-              >
-                <Unlink size={12} />
-                Disconnect
-              </button>
             </div>
+            <button
+              onClick={handleDisconnect}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 12px', fontSize: 12, borderRadius: 6,
+                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+                color: '#ef4444', cursor: 'pointer',
+              }}
+            >
+              <Unlink size={12} />
+              Disconnect
+            </button>
           </div>
         ) : (
-          <div className="px-4 py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/[0.03] flex items-center justify-center">
-                  <Globe size={14} className="text-gray-500" />
-                </div>
-                <div>
-                  <div className="text-sm text-gray-400">Not connected</div>
-                  <div className="text-xs text-gray-600">
-                    Connect to sync events to scbridge.app
-                  </div>
+          <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Globe size={20} style={{ color: '#6b7280', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 14, color: '#9ca3af' }}>Not connected</div>
+                <div style={{ fontSize: 12, color: '#4b5563', marginTop: 1 }}>
+                  Connect to sync events to scbridge.app
                 </div>
               </div>
-              <button
-                onClick={handleConnect}
-                disabled={connecting}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                style={{
-                  background: connecting ? 'rgba(34,211,238,0.05)' : 'rgba(34,211,238,0.1)',
-                  border: '1px solid rgba(34,211,238,0.2)',
-                  color: '#22d3ee',
-                  cursor: connecting ? 'wait' : 'pointer',
-                  opacity: connecting ? 0.6 : 1,
-                }}
-              >
-                <Link size={12} />
-                {connecting ? 'Connecting...' : 'Connect'}
-              </button>
             </div>
+            <button
+              onClick={handleConnect}
+              disabled={connecting}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 12px', fontSize: 12, borderRadius: 6,
+                background: connecting ? 'rgba(34,211,238,0.05)' : 'rgba(34,211,238,0.1)',
+                border: '1px solid rgba(34,211,238,0.2)',
+                color: '#22d3ee',
+                cursor: connecting ? 'wait' : 'pointer',
+                opacity: connecting ? 0.6 : 1,
+              }}
+            >
+              <Link size={12} />
+              {connecting ? 'Connecting...' : 'Connect'}
+            </button>
           </div>
         )}
-      </SettingsSection>
+      </Section>
 
-      {/* Section 2: Event Sync Toggles */}
-      <SettingsSection title="Event Sync">
-        <div className="px-4 py-2 border-b border-white/[0.04] flex items-center justify-between">
-          <span className="text-xs text-gray-500">Choose which events sync to SC Bridge</span>
+      {/* Event Sync */}
+      <Section title="Event Sync">
+        <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <span style={{ fontSize: 12, color: '#6b7280' }}>Choose which events sync to SC Bridge</span>
           <button
             onClick={resetPrefs}
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
           >
             <RotateCcw size={11} />
             Reset
@@ -171,38 +162,36 @@ function Settings({ config, onConfigChange }) {
             <div key={cat.name}>
               <button
                 onClick={() => toggleCategory(cat.name)}
-                className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-white/[0.02] transition-colors"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '10px 16px', background: 'none', border: 'none',
+                  cursor: 'pointer', textAlign: 'left',
+                }}
               >
                 {expanded
-                  ? <ChevronDown size={14} className="text-gray-500" />
-                  : <ChevronRight size={14} className="text-gray-500" />
+                  ? <ChevronDown size={14} style={{ color: '#6b7280' }} />
+                  : <ChevronRight size={14} style={{ color: '#6b7280' }} />
                 }
-                <span className="text-sm text-gray-300 flex-1">{cat.name}</span>
-                <span className="text-xs text-gray-600 font-[family-name:var(--font-mono)]">
+                <span style={{ flex: 1, fontSize: 14, color: '#d1d5db' }}>{cat.name}</span>
+                <span className="font-[family-name:var(--font-mono)]" style={{ fontSize: 12, color: '#4b5563' }}>
                   {enabledCount}/{cat.events.length}
                 </span>
               </button>
               {expanded && (
-                <div className="pl-10 pr-4 pb-2 space-y-1">
+                <div style={{ paddingLeft: 40, paddingRight: 16, paddingBottom: 8 }}>
                   {cat.events.map(evt => (
                     <label
                       key={evt.type}
-                      className="flex items-center gap-2.5 py-1 cursor-pointer group"
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', cursor: 'pointer' }}
                     >
                       <input
                         type="checkbox"
                         checked={!!syncPrefs[evt.type]}
                         onChange={(e) => togglePref(evt.type, e.target.checked)}
-                        className="accent-[#22d3ee]"
-                        style={{ width: 14, height: 14 }}
+                        style={{ width: 14, height: 14, accentColor: '#22d3ee' }}
                       />
-                      <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
-                        {evt.label}
-                      </span>
-                      <span className="text-xs text-gray-700 font-[family-name:var(--font-mono)]">
-                        {evt.type}
-                      </span>
+                      <span style={{ fontSize: 12, color: '#9ca3af' }}>{evt.label}</span>
+                      <span className="font-[family-name:var(--font-mono)]" style={{ fontSize: 12, color: '#374151' }}>{evt.type}</span>
                     </label>
                   ))}
                 </div>
@@ -210,29 +199,31 @@ function Settings({ config, onConfigChange }) {
             </div>
           )
         })}
-      </SettingsSection>
+      </Section>
 
-      {/* Section 3: Data Sources */}
-      <SettingsSection title="Data Sources">
-        <SettingRow
-          icon={FolderOpen}
-          label="Game.log Path"
-          value={config.logPath || 'Auto-detect'}
-          description="Path to Star Citizen Game.log file."
-        />
-      </SettingsSection>
+      {/* Data Sources */}
+      <Section title="Data Sources">
+        <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <FolderOpen size={20} style={{ color: '#5b9bd5', flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, color: '#d1d5db' }}>Game.log Path</div>
+            <div style={{ fontSize: 12, color: '#4b5563', marginTop: 1 }}>Path to Star Citizen Game.log file.</div>
+          </div>
+          <span className="font-[family-name:var(--font-mono)]" style={{ fontSize: 12, color: '#6b7280', flexShrink: 0 }}>
+            {config.logPath || 'Auto-detect'}
+          </span>
+        </div>
+      </Section>
 
-      {/* Section 4: About */}
-      <SettingsSection title="About">
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/[0.03] flex items-center justify-center">
-                <Download size={14} className="text-sc-accent2" />
-              </div>
+      {/* About */}
+      <Section title="About">
+        <div style={{ padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Download size={20} style={{ color: '#5b9bd5', flexShrink: 0 }} />
               <div>
-                <div className="text-sm text-gray-300">SC Bridge Companion</div>
-                <div className="text-xs text-gray-600 font-[family-name:var(--font-mono)]">
+                <div style={{ fontSize: 14, color: '#d1d5db' }}>SC Bridge Companion</div>
+                <div className="font-[family-name:var(--font-mono)]" style={{ fontSize: 12, color: '#4b5563', marginTop: 1 }}>
                   v{version || '...'}
                 </div>
               </div>
@@ -240,10 +231,10 @@ function Settings({ config, onConfigChange }) {
             <button
               onClick={checkForUpdate}
               disabled={checkingUpdate}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer"
               style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 12px', fontSize: 12, borderRadius: 6,
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
                 color: checkingUpdate ? '#4b5563' : '#9ca3af',
                 cursor: checkingUpdate ? 'wait' : 'pointer',
               }}
@@ -253,54 +244,41 @@ function Settings({ config, onConfigChange }) {
             </button>
           </div>
           {updateResult && (
-            <div className="mt-3 text-xs font-[family-name:var(--font-mono)]" style={{
-              padding: '6px 10px',
-              borderRadius: 6,
+            <div className="font-[family-name:var(--font-mono)]" style={{
+              marginTop: 10, padding: '6px 10px', fontSize: 12, borderRadius: 6,
               background: updateResult.hasUpdate ? 'rgba(34,211,238,0.06)' : 'rgba(255,255,255,0.02)',
               border: updateResult.hasUpdate ? '1px solid rgba(34,211,238,0.12)' : '1px solid rgba(255,255,255,0.04)',
             }}>
               {updateResult.error
-                ? <span className="text-red-400">{updateResult.error}</span>
+                ? <span style={{ color: '#ef4444' }}>{updateResult.error}</span>
                 : updateResult.hasUpdate
-                  ? <span className="text-sc-accent">v{updateResult.version} available — update from the banner above</span>
-                  : <span className="text-gray-500">You're on the latest version</span>
+                  ? <span style={{ color: '#22d3ee' }}>v{updateResult.version} available — update from the banner above</span>
+                  : <span style={{ color: '#6b7280' }}>You're on the latest version</span>
               }
             </div>
           )}
         </div>
-      </SettingsSection>
+      </Section>
     </div>
   )
 }
 
-const SettingsSection = ({ title, children }) => (
-  <div className="bg-white/[0.03] backdrop-blur-md border border-white/[0.06] rounded-xl overflow-hidden">
-    <div className="px-4 py-2.5 border-b border-white/[0.06]">
-      <h3 className="font-[family-name:var(--font-display)] text-xs tracking-wider text-gray-500 uppercase">
-        {title}
-      </h3>
-    </div>
-    <div className="divide-y divide-white/[0.04]">
+function Section({ title, children }) {
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.03)',
+      border: '1px solid rgba(255,255,255,0.06)',
+      borderRadius: 12,
+      overflow: 'hidden',
+    }}>
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <h3 className="font-[family-name:var(--font-display)]" style={{ fontSize: 11, letterSpacing: '0.06em', color: '#6b7280', textTransform: 'uppercase' }}>
+          {title}
+        </h3>
+      </div>
       {children}
     </div>
-  </div>
-)
-
-const SettingRow = ({ icon: Icon, label, value, description }) => (
-  <div className="flex items-start gap-3 px-4 py-3">
-    <div className="w-8 h-8 rounded-lg bg-white/[0.03] flex items-center justify-center shrink-0 mt-0.5">
-      <Icon size={14} className="text-sc-accent2" />
-    </div>
-    <div className="flex-1 min-w-0">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-sm text-gray-300">{label}</span>
-        <span className="text-xs font-[family-name:var(--font-mono)] text-gray-500 truncate">
-          {value}
-        </span>
-      </div>
-      <div className="text-xs text-gray-600 mt-0.5">{description}</div>
-    </div>
-  </div>
-)
+  )
+}
 
 export default Settings
