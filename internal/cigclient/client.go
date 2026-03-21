@@ -806,6 +806,28 @@ func (c *Client) GetStats(ctx context.Context) ([]PlayerStat, error) {
 	return stats, nil
 }
 
+// rawCodec is a gRPC codec that passes raw bytes without serialization.
+type rawCodec struct{}
+
+func (rawCodec) Marshal(v interface{}) ([]byte, error) {
+	b, ok := v.([]byte)
+	if !ok {
+		return nil, fmt.Errorf("rawCodec: expected []byte, got %T", v)
+	}
+	return b, nil
+}
+
+func (rawCodec) Unmarshal(data []byte, v interface{}) error {
+	bp, ok := v.(*[]byte)
+	if !ok {
+		return fmt.Errorf("rawCodec: expected *[]byte, got %T", v)
+	}
+	*bp = data
+	return nil
+}
+
+func (rawCodec) Name() string { return "raw" }
+
 // call makes a unary gRPC call using dynamicpb.
 func (c *Client) call(ctx context.Context, method string, setFields func(*dynamicpb.Message)) (*dynamicpb.Message, error) {
 	c.mu.Lock()
@@ -845,9 +867,9 @@ func (c *Client) call(ctx context.Context, method string, setFields func(*dynami
 	})
 	callCtx := metadata.NewOutgoingContext(ctx, md)
 
-	// Make the call
-	respBytes := make([]byte, 0)
-	err = conn.Invoke(callCtx, method, reqBytes, &respBytes)
+	// Make the call using raw codec so []byte passes through correctly
+	var respBytes []byte
+	err = conn.Invoke(callCtx, method, reqBytes, &respBytes, grpc.ForceCodec(rawCodec{}))
 	if err != nil {
 		return nil, fmt.Errorf("invoke %s: %w", method, err)
 	}
