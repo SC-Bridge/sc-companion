@@ -829,12 +829,21 @@ func (c *Client) call(ctx context.Context, method string, setFields func(*dynami
 		setFields(req)
 	}
 
-	// Ensure a timeout exists — default 30s if none set
-	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+	// Ensure a timeout exists — default 15s if none set
+	deadline, hasDeadline := ctx.Deadline()
+	if !hasDeadline {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+		ctx, cancel = context.WithTimeout(ctx, 15*time.Second)
 		defer cancel()
+		deadline, _ = ctx.Deadline()
 	}
+
+	slog.Info("gRPC call starting",
+		"method", method,
+		"token_len", len(token),
+		"deadline", deadline.Format(time.RFC3339),
+		"req_type", string(req.ProtoReflect().Descriptor().FullName()),
+	)
 
 	// Create outgoing context with auth
 	md := metadata.New(map[string]string{
@@ -845,12 +854,28 @@ func (c *Client) call(ctx context.Context, method string, setFields func(*dynami
 	// Pass dynamicpb.Message directly — gRPC's default proto codec handles
 	// serialization via the proto.Message interface that dynamicpb implements.
 	resp := dynamicpb.NewMessage(mi.output)
-	err := conn.Invoke(callCtx, method, req, resp)
-	if err != nil {
-		return nil, fmt.Errorf("invoke %s: %w", method, err)
-	}
 
-	return resp, nil
+	// Run Invoke in a goroutine so we can log if it hangs past the deadline
+	done := make(chan error, 1)
+	go func() {
+		done <- conn.Invoke(callCtx, method, req, resp)
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			slog.Error("gRPC call failed", "method", method, "error", err)
+			return nil, fmt.Errorf("invoke %s: %w", method, err)
+		}
+		slog.Info("gRPC call succeeded", "method", method)
+		return resp, nil
+	case <-ctx.Done():
+		slog.Error("gRPC call timed out — Invoke did not respect context deadline",
+			"method", method,
+			"error", ctx.Err(),
+		)
+		return nil, fmt.Errorf("invoke %s: %w", method, ctx.Err())
+	}
 }
 
 // Close shuts down the connection.
