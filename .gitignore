@@ -31,8 +31,11 @@ go.work.sum
 frontend/node_modules/
 frontend/dist/
 
-# Wails build output
+# Wails build output (keep icon assets)
 build/
+!build/appicon.png
+!build/windows/
+!build/windows/icon.ico
 
 # Editor/IDE
 # .idea/
