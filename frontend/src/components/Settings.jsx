@@ -54,14 +54,14 @@ function Settings({ config, onConfigChange }) {
 
   if (!config) {
     return (
-      <div className="max-w-2xl mx-auto flex items-center justify-center h-64 text-gray-600">
+      <div className="flex items-center justify-center h-64 text-gray-600" style={{ maxWidth: 720, margin: '0 auto' }}>
         Loading settings...
       </div>
     )
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="space-y-6" style={{ maxWidth: 720, margin: '0 auto' }}>
       <div className="flex items-center gap-2 mb-4">
         <SettingsIcon size={16} className="text-sc-accent" />
         <h2 className="font-[family-name:var(--font-display)] text-sm tracking-wider text-gray-400 uppercase">

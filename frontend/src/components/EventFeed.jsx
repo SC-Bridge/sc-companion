@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
-import { Terminal, Filter, Trash2 } from 'lucide-react'
+import { Terminal, Filter } from 'lucide-react'
 
 const SOURCE_COLORS = {
   log: 'text-sc-accent2',
@@ -71,12 +71,12 @@ function EventFeed({ events }) {
     : events
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto">
+    <div className="flex flex-col" style={{ height: '100%', maxWidth: 720, margin: '0 auto' }}>
       {/* Toolbar */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
         <Terminal size={14} className="text-sc-accent" />
         <span className="font-[family-name:var(--font-display)] text-xs tracking-wider text-gray-400 uppercase">
-          Live Event Feed
+          Live Events
         </span>
         <div className="flex-1" />
 
@@ -84,27 +84,33 @@ function EventFeed({ events }) {
           <Filter size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-600" />
           <input
             type="text"
-            placeholder="Filter events..."
+            placeholder="Filter..."
             value={filter}
             onChange={e => setFilter(e.target.value)}
-            className="w-48 pl-7 pr-3 py-1.5 text-xs font-[family-name:var(--font-mono)] bg-white/[0.03] border border-white/[0.06] rounded-lg text-gray-300 placeholder-gray-600 focus:outline-none focus:border-sc-accent/30"
+            className="w-40 pl-7 pr-3 py-1.5 text-xs font-[family-name:var(--font-mono)] bg-white/[0.03] border border-white/[0.06] rounded-lg text-gray-300 placeholder-gray-600 focus:outline-none focus:border-sc-accent/30"
           />
         </div>
 
         <button
           onClick={() => setAutoScroll(v => !v)}
-          className={`px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
-            autoScroll
-              ? 'bg-sc-accent/10 text-sc-accent border-sc-accent/20'
-              : 'text-gray-500 border-white/[0.06] hover:text-gray-300'
-          }`}
+          className="cursor-pointer"
+          style={{
+            padding: '5px 10px',
+            fontSize: 11,
+            borderRadius: 6,
+            border: autoScroll ? '1px solid rgba(34,211,238,0.2)' : '1px solid rgba(255,255,255,0.06)',
+            background: autoScroll ? 'rgba(34,211,238,0.1)' : 'transparent',
+            color: autoScroll ? '#22d3ee' : '#6b7280',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
         >
           Auto-scroll
         </button>
       </div>
 
       {/* Event list */}
-      <div className="flex-1 overflow-y-auto bg-white/[0.02] border border-white/[0.06] rounded-xl font-[family-name:var(--font-mono)] text-xs">
+      <div className="flex-1 overflow-y-auto bg-white/[0.02] border border-white/[0.06] rounded-xl font-[family-name:var(--font-mono)] text-xs" style={{ minHeight: 0 }}>
         {filtered.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-600">
             {events.length === 0 ? 'Waiting for events...' : 'No matching events'}
@@ -136,9 +142,9 @@ function EventFeed({ events }) {
       </div>
 
       {/* Footer stats */}
-      <div className="flex items-center justify-between mt-2 text-[10px] text-gray-600 font-[family-name:var(--font-mono)]">
+      <div className="flex items-center justify-between text-[10px] text-gray-600 font-[family-name:var(--font-mono)]" style={{ marginTop: 6 }}>
         <span>{filtered.length} events{filter ? ` (${events.length} total)` : ''}</span>
-        <span>Buffer: {events.length}/{200}</span>
+        <span>Buffer: {events.length}/200</span>
       </div>
     </div>
   )

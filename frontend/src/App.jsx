@@ -2,11 +2,19 @@ import { useState, useEffect, useCallback } from 'react'
 import StatusBar from './components/StatusBar'
 import Dashboard from './components/Dashboard'
 import EventFeed from './components/EventFeed'
+import Friends from './components/Friends'
 import Settings from './components/Settings'
 import EnvironmentSwitcher from './components/EnvironmentSwitcher'
 
 // Wails runtime bindings
 const wails = window.go?.main?.App
+
+const TABS = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'events', label: 'Events' },
+  { id: 'friends', label: 'Friends' },
+  { id: 'settings', label: 'Settings' },
+]
 
 function App() {
   const [status, setStatus] = useState(null)
@@ -37,7 +45,7 @@ function App() {
     wails.GetConfig().then(setConfig).catch(console.error)
   }, [])
 
-  // Listen for live events — always active (no debug gate)
+  // Listen for live events — always active
   useEffect(() => {
     if (!window.runtime) return
     const cancel = window.runtime.EventsOn('event', (entry) => {
@@ -59,7 +67,6 @@ function App() {
   useEffect(() => {
     if (!window.runtime) return
     const cancel = window.runtime.EventsOn('auth_expired', () => {
-      // Refresh config to update connection state
       if (wails) wails.GetConfig().then(setConfig).catch(console.error)
     })
     return () => { if (cancel) cancel() }
@@ -85,9 +92,8 @@ function App() {
     setShowEnvSwitcher(false)
   }, [])
 
-  // Dev mode fallback when not running in Wails
-  const isDev = !wails
-  if (isDev) {
+  // Dev mode fallback
+  if (!wails) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -107,25 +113,34 @@ function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
       {/* Tab nav */}
-      <nav className="app-nav" style={{ display: 'flex', alignItems: 'center', gap: 4, paddingTop: 8, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        {[
-          { id: 'dashboard', label: 'Dashboard' },
-          { id: 'events', label: 'Event Feed' },
-          { id: 'settings', label: 'Settings' },
-        ].map(tab => (
+      <nav className="app-nav" style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        paddingTop: 6,
+        paddingBottom: 0,
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        {TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className="font-[family-name:var(--font-display)] tracking-wider uppercase"
             style={{
               position: 'relative',
-              padding: '10px 20px',
-              fontSize: 14,
+              padding: '10px 18px',
+              fontSize: 13,
               color: activeTab === tab.id ? '#22d3ee' : '#6b7280',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
               transition: 'color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              if (activeTab !== tab.id) e.currentTarget.style.color = '#9ca3af'
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== tab.id) e.currentTarget.style.color = '#6b7280'
             }}
           >
             {tab.label}
@@ -147,8 +162,9 @@ function App() {
 
       {/* Content */}
       <main className="app-content" style={{ flex: 1, overflowY: 'auto' }}>
-        {activeTab === 'dashboard' && <Dashboard status={status} />}
+        {activeTab === 'dashboard' && <Dashboard status={status} config={config} />}
         {activeTab === 'events' && <EventFeed events={events} />}
+        {activeTab === 'friends' && <Friends config={config} />}
         {activeTab === 'settings' && <Settings config={config} onConfigChange={setConfig} />}
       </main>
 
