@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-// Event represents a parsed game event from any source (log, gRPC).
+// Event represents a parsed game event from the log tailer.
 type Event struct {
 	Type      string            // e.g. "ship_boarded", "contract_accepted", "funds_changed"
-	Source    string            // "log" or "grpc"
+	Source    string            // "log"
 	Timestamp time.Time
 	Data      map[string]string // key-value pairs specific to the event type
 }

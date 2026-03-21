@@ -10,12 +10,10 @@ import (
 
 // Config holds application configuration.
 type Config struct {
-	LogPath      string `yaml:"log_path"`
-	APIEndpoint  string `yaml:"api_endpoint"`
-	APIToken     string `yaml:"api_token"`
-	Environment  string `yaml:"environment"`
-	ProxyEnabled bool   `yaml:"proxy_enabled"`
-	ProxyPort    int    `yaml:"proxy_port"`
+	LogPath     string `yaml:"log_path"`
+	APIEndpoint string `yaml:"api_endpoint"`
+	APIToken    string `yaml:"api_token"`
+	Environment string `yaml:"environment"`
 }
 
 // Default returns a config with sensible defaults.
