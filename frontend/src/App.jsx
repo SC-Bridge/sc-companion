@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Download } from 'lucide-react'
 import StatusBar from './components/StatusBar'
 import Dashboard from './components/Dashboard'
 import EventFeed from './components/EventFeed'
@@ -22,6 +23,7 @@ function App() {
   const [events, setEvents] = useState([])
   const [activeTab, setActiveTab] = useState('dashboard')
   const [showEnvSwitcher, setShowEnvSwitcher] = useState(false)
+  const [updateInfo, setUpdateInfo] = useState(null)
 
   // Poll status every 2 seconds
   useEffect(() => {
@@ -72,6 +74,22 @@ function App() {
     return () => { if (cancel) cancel() }
   }, [])
 
+  // Check for updates on mount, then every 4 hours
+  useEffect(() => {
+    if (!wails) return
+    const check = async () => {
+      try {
+        const info = await wails.CheckForUpdate()
+        if (info?.hasUpdate) setUpdateInfo(info)
+      } catch (e) {
+        // Silent — update check is non-critical
+      }
+    }
+    check()
+    const interval = setInterval(check, 4 * 60 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
+
   // Ctrl+Shift+D toggles environment switcher
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -112,6 +130,43 @@ function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
+      {/* Update banner */}
+      {updateInfo?.hasUpdate && (
+        <div className="app-nav" style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          paddingTop: 6, paddingBottom: 6,
+          background: 'rgba(34,211,238,0.06)',
+          borderBottom: '1px solid rgba(34,211,238,0.12)',
+          fontSize: 12,
+        }}>
+          <Download size={13} style={{ color: '#22d3ee' }} />
+          <span className="text-gray-300">
+            v{updateInfo.version} available
+          </span>
+          <button
+            onClick={() => {
+              if (updateInfo.downloadUrl) wails?.OpenDownloadURL(updateInfo.downloadUrl)
+              else if (updateInfo.url) wails?.OpenDownloadURL(updateInfo.url)
+            }}
+            className="font-[family-name:var(--font-mono)] cursor-pointer"
+            style={{
+              padding: '2px 8px', fontSize: 11, borderRadius: 4,
+              background: 'rgba(34,211,238,0.15)', border: '1px solid rgba(34,211,238,0.2)',
+              color: '#22d3ee', cursor: 'pointer',
+            }}
+          >
+            Download
+          </button>
+          <button
+            onClick={() => setUpdateInfo(null)}
+            className="cursor-pointer"
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14 }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Tab nav */}
       <nav className="app-nav" style={{
         display: 'flex',

@@ -13,6 +13,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/SC-Bridge/sc-companion/internal/auth"
+	"github.com/SC-Bridge/sc-companion/internal/updater"
 	"github.com/SC-Bridge/sc-companion/internal/config"
 	"github.com/SC-Bridge/sc-companion/internal/events"
 	"github.com/SC-Bridge/sc-companion/internal/logtailer"
@@ -84,6 +85,9 @@ type ConnectionStatus struct {
 	Endpoint    string `json:"endpoint"`
 	ConnectedAt string `json:"connectedAt"`
 }
+
+// Version is set at build time via -ldflags.
+var Version = "0.1.0"
 
 const maxRecentEvents = 200
 
@@ -516,4 +520,26 @@ func (a *App) GetConnectionStatus() ConnectionStatus {
 		Endpoint:    a.authInfo.Endpoint,
 		ConnectedAt: a.authInfo.ConnectedAt,
 	}
+}
+
+// --- Version & updates ---
+
+// GetVersion returns the current app version.
+func (a *App) GetVersion() string {
+	return Version
+}
+
+// CheckForUpdate checks GitHub Releases for a newer version.
+func (a *App) CheckForUpdate() *updater.ReleaseInfo {
+	info, err := updater.CheckForUpdate(Version)
+	if err != nil {
+		slog.Error("update check failed", "error", err)
+		return &updater.ReleaseInfo{Version: Version, HasUpdate: false}
+	}
+	return info
+}
+
+// OpenDownloadURL opens the download URL in the default browser.
+func (a *App) OpenDownloadURL(url string) {
+	runtime.BrowserOpenURL(a.ctx, url)
 }
