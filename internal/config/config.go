@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -70,15 +71,28 @@ func Load(path string) (*Config, error) {
 	return cfg, nil
 }
 
-// DetectGameLog attempts to find Game.log by scanning all available drives
-// and common install patterns. Returns the first match found, preferring
-// LIVE over PTU.
+// DetectGameLog attempts to find Game.log using multiple strategies:
+// 1. Windows Registry — reads RSI Launcher install path
+// 2. Drive scanning — checks common install patterns on all drives
+// Returns the first match found, preferring LIVE over PTU.
 func DetectGameLog() string {
 	if runtime.GOOS != "windows" {
 		return ""
 	}
 
-	// Scan all drive letters A-Z
+	channels := []string{"LIVE", "PTU", "EPTU"}
+
+	// Strategy 1: Windows Registry — RSI Launcher uninstall path
+	if rsiRoot := detectFromRegistry(); rsiRoot != "" {
+		for _, channel := range channels {
+			candidate := filepath.Join(rsiRoot, "StarCitizen", channel, "Game.log")
+			if _, err := os.Stat(candidate); err == nil {
+				return candidate
+			}
+		}
+	}
+
+	// Strategy 2: Scan all drive letters with common patterns
 	var drives []string
 	for d := 'C'; d <= 'Z'; d++ {
 		root := string(d) + `:\`
@@ -87,13 +101,9 @@ func DetectGameLog() string {
 		}
 	}
 
-	// Common install path patterns (relative to drive root)
-	// People install SC to wildly different locations
 	patterns := []string{
-		// Default RSI launcher locations
 		`Program Files\Roberts Space Industries\StarCitizen`,
 		`Roberts Space Industries\StarCitizen`,
-		// Common custom locations
 		`Games\Roberts Space Industries\StarCitizen`,
 		`Games\StarCitizen`,
 		`Star Citizen`,
@@ -101,9 +111,6 @@ func DetectGameLog() string {
 		`SC\StarCitizen`,
 		`RSI\StarCitizen`,
 	}
-
-	// Check LIVE first, then PTU, then EPTU
-	channels := []string{"LIVE", "PTU", "EPTU"}
 
 	for _, drive := range drives {
 		for _, pattern := range patterns {
@@ -116,14 +123,10 @@ func DetectGameLog() string {
 		}
 	}
 
-	// Last resort: recursive search for Game.log in StarCitizen directories
+	// Strategy 3: Walk one level deep under any found StarCitizen dirs
 	for _, drive := range drives {
 		for _, pattern := range patterns {
 			scDir := filepath.Join(drive+`:\`, pattern)
-			if _, err := os.Stat(scDir); err != nil {
-				continue
-			}
-			// Walk one level deep looking for Game.log
 			entries, err := os.ReadDir(scDir)
 			if err != nil {
 				continue
@@ -137,6 +140,45 @@ func DetectGameLog() string {
 					return candidate
 				}
 			}
+		}
+	}
+
+	return ""
+}
+
+// detectFromRegistry reads the RSI Launcher install location from the
+// Windows registry (HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall).
+func detectFromRegistry() string {
+	// Use reg.exe to query — avoids CGO dependency on golang.org/x/sys/windows/registry
+	out, err := exec.Command("reg", "query",
+		`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`,
+		"/s", "/f", "RSI Launcher", "/d",
+	).Output()
+	if err != nil {
+		return ""
+	}
+
+	// Parse output for UninstallString which contains the install path
+	// Format: UninstallString    REG_SZ    "D:\Roberts Space Industries\RSI Launcher\Uninstall RSI Launcher.exe" /allusers
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.Contains(line, "UninstallString") {
+			continue
+		}
+		// Extract the path from between quotes
+		start := strings.Index(line, `"`)
+		if start < 0 {
+			continue
+		}
+		end := strings.Index(line[start+1:], `"`)
+		if end < 0 {
+			continue
+		}
+		uninstallPath := line[start+1 : start+1+end]
+		// Go up two directories: "...\RSI Launcher\Uninstall RSI Launcher.exe" → "..."
+		rsiRoot := filepath.Dir(filepath.Dir(uninstallPath))
+		if _, err := os.Stat(rsiRoot); err == nil {
+			return rsiRoot
 		}
 	}
 
