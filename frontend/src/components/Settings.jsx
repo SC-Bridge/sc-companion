@@ -1,4 +1,4 @@
-import { Settings as SettingsIcon, FolderOpen, Key, Radio, Globe } from 'lucide-react'
+import { Settings as SettingsIcon, FolderOpen, Key, Globe } from 'lucide-react'
 
 function Settings({ config }) {
   if (!config) {
@@ -26,12 +26,6 @@ function Settings({ config }) {
           value={config.logPath || 'Auto-detect'}
           description="Path to Star Citizen Game.log file. Leave empty for auto-detection."
         />
-        <SettingRow
-          icon={Radio}
-          label="gRPC Proxy"
-          value={config.proxyEnabled ? `Enabled (port ${config.proxyPort})` : 'Disabled'}
-          description="Intercepts game-to-CIG backend traffic for wallet, reputation, and blueprint data."
-        />
       </SettingsSection>
 
       {/* API Connection */}
@@ -46,7 +40,7 @@ function Settings({ config }) {
           icon={Key}
           label="API Token"
           value={config.apiToken ? '••••••••' : 'Not configured'}
-          description="Authentication token for syncing events to scbridge.app."
+          description="Authentication token for syncing data to scbridge.app."
         />
       </SettingsSection>
 
@@ -55,10 +49,6 @@ function Settings({ config }) {
         <p>
           Configuration is stored in <span className="font-[family-name:var(--font-mono)] text-gray-500">config.yaml</span>.
           Changes require restarting the companion app.
-        </p>
-        <p className="mt-2">
-          CA certificate for gRPC interception is stored in the app data directory.
-          On Windows: <span className="font-[family-name:var(--font-mono)] text-gray-500">%APPDATA%\SCBridge\ca.crt</span>
         </p>
       </div>
     </div>

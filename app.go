@@ -14,7 +14,6 @@ import (
 	"github.com/SC-Bridge/sc-companion/internal/cigclient"
 	"github.com/SC-Bridge/sc-companion/internal/config"
 	"github.com/SC-Bridge/sc-companion/internal/events"
-	"github.com/SC-Bridge/sc-companion/internal/grpcproxy"
 	"github.com/SC-Bridge/sc-companion/internal/logtailer"
 	"github.com/SC-Bridge/sc-companion/internal/store"
 	storesync "github.com/SC-Bridge/sc-companion/internal/sync"
@@ -29,7 +28,6 @@ type App struct {
 	bus       *events.Bus
 	db        *store.Store
 	trayCtrl  *tray.Controller
-	proxy     *grpcproxy.Proxy
 	tailer    *logtailer.Tailer
 	cigClient *cigclient.Client
 	syncMgr   *cigclient.SyncManager
@@ -55,7 +53,6 @@ type StatusInfo struct {
 	CurrentShip   string `json:"currentShip"`
 	Location      string `json:"location"`
 	Jurisdiction  string `json:"jurisdiction"`
-	ProxyRunning  bool   `json:"proxyRunning"`
 	TailerActive  bool   `json:"tailerActive"`
 	GameConnected bool   `json:"gameConnected"`
 	SyncActive    bool   `json:"syncActive"`
@@ -69,8 +66,6 @@ type AppConfig struct {
 	LogPath      string `json:"logPath"`
 	APIEndpoint  string `json:"apiEndpoint"`
 	APIToken     string `json:"apiToken"`
-	ProxyEnabled bool   `json:"proxyEnabled"`
-	ProxyPort    int    `json:"proxyPort"`
 	DebugMode    bool   `json:"debugMode"`
 }
 
@@ -167,26 +162,6 @@ func (a *App) startup(ctx context.Context) {
 		syncClient := storesync.NewClient(cfg.APIEndpoint, cfg.APIToken, db)
 		go syncClient.Run(svcCtx)
 		slog.Info("API sync enabled")
-	}
-
-	// Start gRPC proxy
-	if cfg.ProxyEnabled {
-		proxyPort := cfg.ProxyPort
-		if cfg.ProxyDirect && proxyPort == 8443 {
-			proxyPort = 443 // direct mode needs port 443
-		}
-		proxy, err := grpcproxy.NewProxy(grpcproxy.ProxyConfig{
-			ListenAddr:  fmt.Sprintf("127.0.0.1:%d", proxyPort),
-			CADir:       config.DataDir(),
-			DirectMode:  cfg.ProxyDirect,
-			BackendAddr: cfg.BackendAddr,
-		}, a.bus)
-		if err != nil {
-			slog.Error("gRPC proxy failed to start", "error", err)
-		} else {
-			a.proxy = proxy
-			go proxy.Run(svcCtx)
-		}
 	}
 
 	// Start log tailer
@@ -331,10 +306,6 @@ func (a *App) GetStatus() StatusInfo {
 		}
 	}
 
-	if a.proxy != nil {
-		status.ProxyRunning = a.proxy.IsRunning()
-	}
-
 	status.TailerActive = a.tailer != nil
 
 	a.mu.Lock()
@@ -351,12 +322,10 @@ func (a *App) GetConfig() AppConfig {
 		return AppConfig{}
 	}
 	return AppConfig{
-		LogPath:      a.cfg.LogPath,
-		APIEndpoint:  a.cfg.APIEndpoint,
-		APIToken:     a.cfg.APIToken,
-		ProxyEnabled: a.cfg.ProxyEnabled,
-		ProxyPort:    a.cfg.ProxyPort,
-		DebugMode:    a.debugMode,
+		LogPath:     a.cfg.LogPath,
+		APIEndpoint: a.cfg.APIEndpoint,
+		APIToken:    a.cfg.APIToken,
+		DebugMode:   a.debugMode,
 	}
 }
 

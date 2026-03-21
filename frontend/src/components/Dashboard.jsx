@@ -133,11 +133,6 @@ function Dashboard({ status }) {
             active={status?.syncActive}
             note="Set API token in settings"
           />
-          <DataSourceRow
-            label="gRPC Proxy"
-            description="MITM proxy for capturing raw gRPC traffic (advanced debugging)"
-            active={status?.proxyRunning}
-          />
         </div>
       </div>
     </div>

@@ -10,21 +10,15 @@ import (
 
 // Config holds application configuration.
 type Config struct {
-	LogPath      string `yaml:"log_path"`
-	APIEndpoint  string `yaml:"api_endpoint"`
-	APIToken     string `yaml:"api_token"`
-	ProxyEnabled bool   `yaml:"proxy_enabled"`
-	ProxyPort    int    `yaml:"proxy_port"`
-	ProxyDirect  bool   `yaml:"proxy_direct"`  // direct TLS mode (hosts file redirect)
-	BackendAddr  string `yaml:"backend_addr"`   // real CIG backend IP:port
+	LogPath     string `yaml:"log_path"`
+	APIEndpoint string `yaml:"api_endpoint"`
+	APIToken    string `yaml:"api_token"`
 }
 
 // Default returns a config with sensible defaults.
 func Default() *Config {
 	return &Config{
-		APIEndpoint:  "https://scbridge.app/api",
-		ProxyEnabled: false,
-		ProxyPort:    8443,
+		APIEndpoint: "https://scbridge.app/api",
 	}
 }
 
