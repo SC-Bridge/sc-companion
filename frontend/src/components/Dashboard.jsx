@@ -1,4 +1,45 @@
-import { FileText, Database, Link } from 'lucide-react'
+import { FileText, Database, Globe, ExternalLink } from 'lucide-react'
+
+const wails = window.go?.main?.App
+
+const EXTENSIONS = [
+  {
+    name: 'Chrome',
+    url: 'https://chromewebstore.google.com/detail/sc-bridge-sync/gcokkoamjodagagbojhkimfbjjpdfefi',
+    icon: (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+        <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="12" y1="8" x2="21" y2="5" stroke="currentColor" strokeWidth="1.5" opacity="0.6" />
+        <line x1="8.5" y1="14" x2="3" y2="18" stroke="currentColor" strokeWidth="1.5" opacity="0.6" />
+        <line x1="15.5" y1="14" x2="21" y2="18" stroke="currentColor" strokeWidth="1.5" opacity="0.6" />
+      </svg>
+    ),
+    color: '#4285f4',
+  },
+  {
+    name: 'Firefox',
+    url: 'https://addons.mozilla.org/en-US/firefox/addon/sc-bridge-sync/',
+    icon: (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+        <path d="M7 8c1-3 4-4 5-4s3 .5 4 2c1 1.5.5 3 .5 3s1-1.5-1-3c-1.5-1.2-3-1-3-1s2.5.5 3 3c.3 1.5-.5 3-2 4s-3.5 1-5 0-2.5-3-1.5-4z" stroke="currentColor" strokeWidth="1.2" />
+      </svg>
+    ),
+    color: '#ff7139',
+  },
+  {
+    name: 'Edge',
+    url: 'https://microsoftedge.microsoft.com/addons/detail/sc-bridge-sync/edndedmmbdbofdphimpcofdccbpbgjib',
+    icon: (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c4.3 0 7.9-2.7 9.3-6.5" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+        <path d="M20 8c-1-2.5-3-4.5-5.5-5.5M8 20c1.5-2 4-6 4-8s-1-3.5-1-3.5c2 0 4.5 1.5 5 4s-1 5-4 6.5" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    ),
+    color: '#0078d7',
+  },
+]
 
 const StatCard = ({ icon: Icon, label, value, variant }) => (
   <div style={{
@@ -88,6 +129,49 @@ function Dashboard({ status, config }) {
             active={config?.connected}
             note={config?.connected ? undefined : 'Connect in Settings'}
           />
+        </div>
+      </div>
+
+      {/* Browser Extensions */}
+      <div style={{ padding: '18px 20px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, marginTop: 16 }}>
+        <h3 className="font-[family-name:var(--font-display)]" style={{ fontSize: 11, letterSpacing: '0.05em', color: '#6b7280', textTransform: 'uppercase', marginBottom: 6 }}>
+          Browser Extension
+        </h3>
+        <p style={{ fontSize: 12, color: '#4b5563', marginBottom: 14, lineHeight: 1.5 }}>
+          Sync your hangar, pledges, and buyback data directly from the RSI website
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          {EXTENSIONS.map(ext => (
+            <button
+              key={ext.name}
+              onClick={() => wails?.OpenDownloadURL(ext.url)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                padding: '14px 12px',
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 10,
+                cursor: 'pointer',
+                transition: 'all 200ms',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = `${ext.color}15`
+                e.currentTarget.style.borderColor = `${ext.color}40`
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.02)'
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
+              }}
+            >
+              <div style={{ color: ext.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {ext.icon}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 12, color: '#d1d5db', fontWeight: 500 }}>{ext.name}</span>
+                <ExternalLink size={10} style={{ color: '#6b7280' }} />
+              </div>
+            </button>
+          ))}
         </div>
       </div>
     </div>
