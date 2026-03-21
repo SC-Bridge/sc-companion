@@ -30,13 +30,14 @@ type WalletBalance struct {
 	Currency string `json:"currency"`
 }
 
-// Friend represents a friend with presence info.
+// Friend represents a contact with presence info (from ContactsService).
 type Friend struct {
 	Nickname    string `json:"nickname"`
 	DisplayName string `json:"displayName"`
 	AccountID   uint32 `json:"accountId"`
-	Status      string `json:"status"` // offline, online, away, etc.
-	Activity    string `json:"activity"`
+	AvatarURL   string `json:"avatarUrl"`
+	Status      string `json:"status"`   // offline, online, away, activity, etc.
+	Activity    string `json:"activity"`  // e.g. "persistent_universe"
 }
 
 // ReputationScore represents a faction reputation score.
@@ -45,6 +46,8 @@ type ReputationScore struct {
 	Scope        string  `json:"scope"`
 	Score        int32   `json:"score"`
 	StandingTier string  `json:"standing_tier"`
+	StandingsID  string  `json:"standings_id"`  // matches reputation_scopes.uuid
+	StandingID   string  `json:"standing_id"`   // matches reputation_standings.uuid
 	Drift        float64 `json:"drift"`
 }
 
@@ -273,47 +276,55 @@ func (c *Client) GetWallet(ctx context.Context) ([]WalletBalance, error) {
 	return wallets, nil
 }
 
-// GetFriends returns the player's friend list with presence.
+// GetFriends returns the player's contacts with presence via ContactsService.
 func (c *Client) GetFriends(ctx context.Context) ([]Friend, error) {
-	resp, err := c.call(ctx, "/sc.external.services.friends.v1.FriendService/GetFriendList", nil)
+	resp, err := c.call(ctx, "/sc.external.services.contacts.v1.ContactsService/ListContacts", func(req *dynamicpb.Message) {
+		// Set pagination directly on the request (not nested under query)
+		paginationField := req.Descriptor().Fields().ByName("pagination")
+		if paginationField != nil {
+			paginationMsg := dynamicpb.NewMessage(paginationField.Message())
+			firstField := paginationMsg.Descriptor().Fields().ByName("first")
+			if firstField != nil {
+				paginationMsg.Set(firstField, protoreflect.ValueOfUint32(500))
+			}
+			req.Set(paginationField, protoreflect.ValueOfMessage(paginationMsg))
+		}
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	jsonBytes, err := protojson.Marshal(resp)
-	if err != nil {
-		return nil, fmt.Errorf("marshal response: %w", err)
-	}
-	slog.Info("GetFriendList response", "json", string(jsonBytes))
-
-	var friends []Friend
-	friendsField := resp.Descriptor().Fields().ByName("friends")
-	if friendsField == nil {
-		return nil, fmt.Errorf("no friends field in response")
-	}
-
 	statuses := []string{"unspecified", "offline", "online", "away", "dnd", "activity", "invisible"}
 
-	list := resp.Get(friendsField).List()
+	var friends []Friend
+	contactsField := resp.Descriptor().Fields().ByName("contacts")
+	if contactsField == nil {
+		return nil, fmt.Errorf("no contacts field in ListContacts response")
+	}
+
+	list := resp.Get(contactsField).List()
+	slog.Info("ListContacts returned", "count", list.Len())
+
 	for i := 0; i < list.Len(); i++ {
-		friendMsg := list.Get(i).Message()
+		contact := list.Get(i).Message()
 
 		// Get account info
-		accountField := friendMsg.Descriptor().Fields().ByName("account")
+		accountField := contact.Descriptor().Fields().ByName("account")
 		if accountField == nil {
 			continue
 		}
-		account := friendMsg.Get(accountField).Message()
+		account := contact.Get(accountField).Message()
 		nickname := account.Get(account.Descriptor().Fields().ByName("nickname")).String()
 		displayName := account.Get(account.Descriptor().Fields().ByName("display_name")).String()
 		accountID := uint32(account.Get(account.Descriptor().Fields().ByName("account_id")).Uint())
+		avatarURL := account.Get(account.Descriptor().Fields().ByName("avatar_url")).String()
 
-		// Get presence
-		status := "unknown"
+		// Get presence — no presence block means offline
+		status := "offline"
 		activity := ""
-		presenceField := friendMsg.Descriptor().Fields().ByName("presence")
-		if presenceField != nil {
-			presence := friendMsg.Get(presenceField).Message()
+		presenceField := contact.Descriptor().Fields().ByName("presence")
+		if presenceField != nil && contact.Has(presenceField) {
+			presence := contact.Get(presenceField).Message()
 			statusField := presence.Descriptor().Fields().ByName("status")
 			if statusField != nil {
 				statusNum := int(presence.Get(statusField).Enum())
@@ -335,6 +346,7 @@ func (c *Client) GetFriends(ctx context.Context) ([]Friend, error) {
 			Nickname:    nickname,
 			DisplayName: displayName,
 			AccountID:   accountID,
+			AvatarURL:   avatarURL,
 			Status:      status,
 			Activity:    activity,
 		})
@@ -375,9 +387,11 @@ func (c *Client) GetReputation(ctx context.Context) ([]ReputationScore, error) {
 		entityID := rep.Get(rep.Descriptor().Fields().ByName("entity")).String()
 		scope := rep.Get(rep.Descriptor().Fields().ByName("scope")).String()
 		score := int32(rep.Get(rep.Descriptor().Fields().ByName("score")).Int())
+		standingsID := rep.Get(rep.Descriptor().Fields().ByName("standings_id")).String()
 
-		// Extract standing tier name
+		// Extract standing tier name + UUID for cross-referencing
 		standingTier := ""
+		standingID := ""
 		standingField := vr.Descriptor().Fields().ByName("standing")
 		if standingField != nil {
 			standing := vr.Get(standingField).Message()
@@ -385,29 +399,24 @@ func (c *Client) GetReputation(ctx context.Context) ([]ReputationScore, error) {
 			if nameField != nil {
 				standingTier = standing.Get(nameField).String()
 			}
+			idField := standing.Descriptor().Fields().ByName("id")
+			if idField != nil {
+				standingID = standing.Get(idField).String()
+			}
 		}
 
-		// Extract drift from lock or standing
+		// Extract drift time from standing
 		var drift float64
-		standingDriftField := func() *float64 {
-			if standingField == nil {
-				return nil
-			}
+		if standingField != nil {
 			s := vr.Get(standingField).Message()
 			df := s.Descriptor().Fields().ByName("drift")
-			if df == nil {
-				return nil
+			if df != nil && s.Has(df) {
+				driftMsg := s.Get(df).Message()
+				timeField := driftMsg.Descriptor().Fields().ByName("time")
+				if timeField != nil {
+					drift = float64(driftMsg.Get(timeField).Uint())
+				}
 			}
-			driftMsg := s.Get(df).Message()
-			amountField := driftMsg.Descriptor().Fields().ByName("amount")
-			if amountField == nil {
-				return nil
-			}
-			v := float64(driftMsg.Get(amountField).Int())
-			return &v
-		}()
-		if standingDriftField != nil {
-			drift = *standingDriftField
 		}
 
 		scores = append(scores, ReputationScore{
@@ -415,6 +424,8 @@ func (c *Client) GetReputation(ctx context.Context) ([]ReputationScore, error) {
 			Scope:        scope,
 			Score:        score,
 			StandingTier: standingTier,
+			StandingsID:  standingsID,
+			StandingID:   standingID,
 			Drift:        drift,
 		})
 	}

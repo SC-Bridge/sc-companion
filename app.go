@@ -472,14 +472,14 @@ func (a *App) TestAllGrpc() string {
 		results = append(results, fmt.Sprintf("wallet: %d ledgers", len(wallets)))
 	}
 
-	// Friends
+	// Friends (via ContactsService)
 	if friends, err := client.GetFriends(ctx); err != nil {
 		a.emitGrpcEvent("friends_error", map[string]string{"error": err.Error()})
 		results = append(results, "friends: ERROR "+err.Error())
 	} else {
 		online := 0
 		for _, f := range friends {
-			if f.Status == "online" {
+			if f.Status == "activity" || f.Status == "online" {
 				online++
 			}
 		}
@@ -487,7 +487,7 @@ func (a *App) TestAllGrpc() string {
 			"total":  fmt.Sprintf("%d", len(friends)),
 			"online": fmt.Sprintf("%d", online),
 		})
-		results = append(results, fmt.Sprintf("friends: %d total, %d online", len(friends), online))
+		results = append(results, fmt.Sprintf("friends: %d total, %d online/in-game", len(friends), online))
 	}
 
 	// Reputation
@@ -495,10 +495,12 @@ func (a *App) TestAllGrpc() string {
 		a.emitGrpcEvent("reputation_error", map[string]string{"error": err.Error()})
 		results = append(results, "reputation: ERROR "+err.Error())
 	} else {
-		a.emitGrpcEvent("reputation_data", map[string]string{
-			"factions": fmt.Sprintf("%d", len(scores)),
-		})
-		results = append(results, fmt.Sprintf("reputation: %d factions", len(scores)))
+		data := map[string]string{"count": fmt.Sprintf("%d", len(scores))}
+		for _, s := range scores {
+			data[s.Scope] = fmt.Sprintf("%d (%s)", s.Score, s.StandingTier)
+		}
+		a.emitGrpcEvent("reputation_data", data)
+		results = append(results, fmt.Sprintf("reputation: %d scopes", len(scores)))
 	}
 
 	// Blueprints
