@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Settings as SettingsIcon, FolderOpen, Globe, Link, Unlink, RotateCcw, ChevronDown, ChevronRight, RefreshCw, Download, Database, FileText } from 'lucide-react'
+import { Settings as SettingsIcon, FolderOpen, Globe, Link, Unlink, RotateCcw, ChevronDown, ChevronRight, RefreshCw, Download, Database, FileText, Monitor } from 'lucide-react'
 
 const wails = window.go?.main?.App
 
@@ -13,6 +13,8 @@ function Settings({ config, onConfigChange, onUpdateFound }) {
   const [updateResult, setUpdateResult] = useState(null)
   const [eventLogPath, setEventLogPath] = useState('')
   const [dbPath, setDbPath] = useState('')
+  const [minimizeToTray, setMinimizeToTray] = useState(false)
+  const [startWithWindows, setStartWithWindows] = useState(false)
 
   useEffect(() => {
     if (!wails) return
@@ -21,6 +23,20 @@ function Settings({ config, onConfigChange, onUpdateFound }) {
     wails.GetVersion().then(setVersion).catch(console.error)
     wails.GetEventLogPath().then(setEventLogPath).catch(console.error)
     wails.GetDatabasePath().then(setDbPath).catch(console.error)
+    wails.GetMinimizeToTray().then(setMinimizeToTray).catch(console.error)
+    wails.GetStartWithWindows().then(setStartWithWindows).catch(console.error)
+  }, [])
+
+  const handleMinimizeToTray = useCallback(async (enabled) => {
+    if (!wails) return
+    await wails.SetMinimizeToTray(enabled)
+    setMinimizeToTray(enabled)
+  }, [])
+
+  const handleStartWithWindows = useCallback(async (enabled) => {
+    if (!wails) return
+    await wails.SetStartWithWindows(enabled)
+    setStartWithWindows(enabled)
   }, [])
 
   const checkForUpdate = useCallback(async () => {
@@ -311,6 +327,60 @@ function Settings({ config, onConfigChange, onUpdateFound }) {
           )}
         </div>
       </Section>
+
+      {/* System */}
+      <Section title="System">
+        <ToggleRow
+          icon={Monitor}
+          label="Minimize to tray"
+          description="Hide to the system tray instead of the taskbar when minimized or closed"
+          checked={minimizeToTray}
+          onChange={handleMinimizeToTray}
+        />
+        <ToggleRow
+          icon={Monitor}
+          label="Start with Windows"
+          description="Launch SC Bridge Companion automatically when Windows starts"
+          checked={startWithWindows}
+          onChange={handleStartWithWindows}
+          last
+        />
+      </Section>
+    </div>
+  )
+}
+
+function ToggleRow({ icon: Icon, label, description, checked, onChange, last }) {
+  return (
+    <div style={{
+      padding: '12px 16px',
+      display: 'flex', alignItems: 'center', gap: 12,
+      borderBottom: last ? 'none' : '1px solid rgba(255,255,255,0.04)',
+    }}>
+      <Icon size={18} style={{ color: '#5b9bd5', flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, color: '#d1d5db' }}>{label}</div>
+        <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2 }}>{description}</div>
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        style={{
+          position: 'relative',
+          width: 36, height: 20, borderRadius: 10, flexShrink: 0,
+          background: checked ? 'rgba(34,211,238,0.8)' : 'rgba(255,255,255,0.1)',
+          border: 'none', cursor: 'pointer', padding: 0,
+          transition: 'background 0.2s',
+        }}
+      >
+        <span style={{
+          position: 'absolute',
+          top: 2, left: checked ? 18 : 2,
+          width: 16, height: 16, borderRadius: '50%',
+          background: '#fff',
+          transition: 'left 0.2s',
+          display: 'block',
+        }} />
+      </button>
     </div>
   )
 }

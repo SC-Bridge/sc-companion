@@ -2,6 +2,7 @@ package logtailer
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"io"
 	"log/slog"
@@ -32,7 +33,9 @@ func New(path string, bus *events.Bus) (*Tailer, error) {
 	}, nil
 }
 
-// Run starts tailing the log file. It seeks to the end and reads new lines.
+// Run starts tailing the log file. It seeks back to the last player_login
+// line, replays events from that point to the current EOF to restore session
+// state, then continues tailing for new lines.
 // Blocks until ctx is cancelled.
 func (t *Tailer) Run(ctx context.Context) error {
 	f, err := os.Open(t.path)
@@ -41,9 +44,11 @@ func (t *Tailer) Run(ctx context.Context) error {
 	}
 	defer f.Close()
 
-	// Seek to end — we only want new lines
-	if _, err := f.Seek(0, io.SeekEnd); err != nil {
-		return err
+	if err := t.seekToLastSession(f); err != nil {
+		slog.Warn("seekToLastSession failed, tailing from EOF", "error", err)
+		if _, err := f.Seek(0, io.SeekEnd); err != nil {
+			return err
+		}
 	}
 
 	slog.Info("tailing log", "path", t.path)
@@ -62,6 +67,64 @@ func (t *Tailer) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// seekToLastSession scans backwards through the file to find the last
+// player_login line (identified by the nickname=" marker) and seeks f to
+// the start of that line. If no login is found, seeks to EOF so that only
+// new lines will be read.
+func (t *Tailer) seekToLastSession(f *os.File) error {
+	size, err := f.Seek(0, io.SeekEnd)
+	if err != nil {
+		return err
+	}
+	if size == 0 {
+		return nil
+	}
+
+	loginMarker := []byte(`nickname="`)
+	const chunkSize = 64 * 1024 // 64 KB
+
+	pos := size
+	for pos > 0 {
+		readSize := int64(chunkSize)
+		if pos < readSize {
+			readSize = pos
+		}
+		pos -= readSize
+
+		if _, err := f.Seek(pos, io.SeekStart); err != nil {
+			return err
+		}
+
+		buf := make([]byte, readSize)
+		n, err := io.ReadFull(f, buf)
+		if err != nil && err != io.ErrUnexpectedEOF {
+			return err
+		}
+		buf = buf[:n]
+
+		idx := bytes.LastIndex(buf, loginMarker)
+		if idx < 0 {
+			continue
+		}
+
+		// Find the newline before the match to locate the line start
+		lineStart := bytes.LastIndexByte(buf[:idx], '\n')
+		var lineOffset int64
+		if lineStart < 0 {
+			lineOffset = pos // match is on the first line of this chunk
+		} else {
+			lineOffset = pos + int64(lineStart+1)
+		}
+
+		_, err = f.Seek(lineOffset, io.SeekStart)
+		return err
+	}
+
+	// No login found — tail from EOF only
+	_, err = f.Seek(0, io.SeekEnd)
+	return err
 }
 
 // RunFromStart processes an entire log file from the beginning (for replay/analysis).

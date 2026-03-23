@@ -39,7 +39,7 @@ func NewParser() *Parser {
 		// Ship boarding — "You have joined channel 'Ship Name : OwnerHandle'"
 		{
 			name: "ship_boarded",
-			re:   regexp.MustCompile(`Added notification "You have joined channel '([^']+)'`),
+			re:   regexp.MustCompile(`Added notification "You have joined channel '(.+?)'"`),
 			extract: func(m []string) events.Event {
 				channel := m[1]
 				ship, owner := parseShipChannel(channel)
@@ -52,7 +52,7 @@ func NewParser() *Parser {
 		// Ship exiting
 		{
 			name: "ship_exited",
-			re:   regexp.MustCompile(`Added notification "You have left the channel '([^']+)'`),
+			re:   regexp.MustCompile(`Added notification "You have left the channel '(.+?)'"`),
 			extract: func(m []string) events.Event {
 				channel := m[1]
 				ship, owner := parseShipChannel(channel)

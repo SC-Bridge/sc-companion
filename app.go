@@ -9,9 +9,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
+	"strings"
 	"sync"
 	"time"
 
+	"fyne.io/systray"
 	wailsrt "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/SC-Bridge/sc-companion/internal/auth"
@@ -26,15 +28,17 @@ import (
 
 // App is the main application struct bound to the Wails frontend.
 type App struct {
-	ctx      context.Context
-	cancel   context.CancelFunc
-	cfg      *config.Config
-	cfgPath  string
-	bus      *events.Bus
-	db       *store.Store
-	trayCtrl *tray.Controller
-	tailer   *logtailer.Tailer
-	mu       sync.Mutex
+	ctx          context.Context
+	cancel       context.CancelFunc
+	svcCtx       context.Context
+	cfg          *config.Config
+	cfgPath      string
+	bus          *events.Bus
+	db           *store.Store
+	trayCtrl     *tray.Controller
+	tailer       *logtailer.Tailer
+	tailerCancel context.CancelFunc
+	mu           sync.Mutex
 
 	// Auth
 	authInfo   *auth.AuthInfo
@@ -92,7 +96,7 @@ type ConnectionStatus struct {
 }
 
 // Version is set at build time via -ldflags.
-var Version = "0.1.0"
+var Version = "0.3.4"
 
 const maxRecentEvents = 200
 
@@ -152,6 +156,7 @@ func (a *App) startup(ctx context.Context) {
 	// Create a cancellable context for services
 	svcCtx, svcCancel := context.WithCancel(context.Background())
 	a.cancel = svcCancel
+	a.svcCtx = svcCtx
 
 	// Tray controller
 	a.trayCtrl = tray.NewController(a.bus, a.db, svcCancel)
@@ -230,16 +235,13 @@ func (a *App) startup(ctx context.Context) {
 	if logPath == "" {
 		logPath = config.DetectGameLog()
 	}
-	if logPath != "" {
-		tailer, err := logtailer.New(logPath, a.bus)
-		if err != nil {
-			slog.Error("log tailer failed", "error", err)
-		} else {
-			a.tailer = tailer
-			go tailer.Run(svcCtx)
-			slog.Info("log tailer started", "path", logPath)
-		}
-	}
+	a.restartTailer(logPath)
+
+	// System tray
+	go systray.Run(a.onSystrayReady, nil)
+
+	// Minimize-to-tray watcher
+	go a.minimizeWatcher(svcCtx)
 
 	slog.Info("SC Bridge Companion started")
 }
@@ -388,7 +390,8 @@ func (a *App) OpenInExplorer(filePath string) {
 	}
 }
 
-// BrowseGameLog opens a file dialog to select the Game.log path and saves it.
+// BrowseGameLog opens a file dialog to select the Game.log path, saves it,
+// and (re)starts the log tailer against the chosen file.
 func (a *App) BrowseGameLog() string {
 	selection, err := wailsrt.OpenFileDialog(a.ctx, wailsrt.OpenDialogOptions{
 		Title: "Select Game.log",
@@ -406,7 +409,37 @@ func (a *App) BrowseGameLog() string {
 	a.cfg.Save(a.cfgPath)
 	a.mu.Unlock()
 
+	a.restartTailer(selection)
 	return selection
+}
+
+// restartTailer stops any running tailer and starts a new one for the given path.
+// A no-op if path is empty.
+func (a *App) restartTailer(path string) {
+	if path == "" {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	// Stop existing tailer
+	if a.tailerCancel != nil {
+		a.tailerCancel()
+		a.tailerCancel = nil
+		a.tailer = nil
+	}
+
+	tailer, err := logtailer.New(path, a.bus)
+	if err != nil {
+		slog.Error("log tailer failed", "path", path, "error", err)
+		return
+	}
+
+	ctx, cancel := context.WithCancel(a.svcCtx)
+	a.tailer = tailer
+	a.tailerCancel = cancel
+	go tailer.Run(ctx)
+	slog.Info("log tailer started", "path", path)
 }
 
 // --- Environment switcher ---
@@ -643,4 +676,109 @@ func (a *App) ApplyUpdate(downloadURL string) string {
 		return err.Error()
 	}
 	return ""
+}
+
+// --- System tray ---
+
+// onSystrayReady is called by the systray library when the tray icon is ready.
+func (a *App) onSystrayReady() {
+	systray.SetIcon(tray.Icon())
+	systray.SetTooltip("SC Bridge Companion")
+
+	mShow := systray.AddMenuItem("Show", "Show SC Bridge Companion")
+	systray.AddSeparator()
+	mQuit := systray.AddMenuItem("Quit", "Quit SC Bridge Companion")
+
+	for {
+		select {
+		case <-mShow.ClickedCh:
+			wailsrt.WindowShow(a.ctx)
+		case <-mQuit.ClickedCh:
+			systray.Quit()
+			wailsrt.Quit(a.ctx)
+		}
+	}
+}
+
+// minimizeWatcher polls for window minimization and hides to tray when enabled.
+func (a *App) minimizeWatcher(ctx context.Context) {
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			a.mu.Lock()
+			minimize := a.cfg != nil && a.cfg.MinimizeToTray
+			a.mu.Unlock()
+			if minimize && wailsrt.WindowIsMinimised(a.ctx) {
+				wailsrt.WindowHide(a.ctx)
+			}
+		}
+	}
+}
+
+// beforeClose is called by Wails when the user clicks the window close button.
+// If minimize-to-tray is enabled, hides the window instead of quitting.
+func (a *App) beforeClose(ctx context.Context) bool {
+	a.mu.Lock()
+	minimize := a.cfg != nil && a.cfg.MinimizeToTray
+	a.mu.Unlock()
+	if minimize {
+		wailsrt.WindowHide(ctx)
+		return true // prevent quit
+	}
+	return false // allow quit
+}
+
+// --- System settings ---
+
+// GetMinimizeToTray returns whether minimize-to-tray is enabled.
+func (a *App) GetMinimizeToTray() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cfg != nil && a.cfg.MinimizeToTray
+}
+
+// SetMinimizeToTray enables or disables minimize-to-tray and persists the setting.
+func (a *App) SetMinimizeToTray(enabled bool) {
+	a.mu.Lock()
+	a.cfg.MinimizeToTray = enabled
+	a.cfg.Save(a.cfgPath)
+	a.mu.Unlock()
+}
+
+// GetStartWithWindows reports whether the app is registered to launch at Windows startup.
+func (a *App) GetStartWithWindows() bool {
+	out, err := exec.Command("reg", "query",
+		`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`,
+		"/v", "SC Bridge Companion",
+	).Output()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(out), "SC Bridge Companion")
+}
+
+// SetStartWithWindows adds or removes the Windows startup registry entry.
+func (a *App) SetStartWithWindows(enabled bool) error {
+	if enabled {
+		exePath, err := os.Executable()
+		if err != nil {
+			return err
+		}
+		return exec.Command("reg", "add",
+			`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`,
+			"/v", "SC Bridge Companion",
+			"/t", "REG_SZ",
+			"/d", `"`+exePath+`"`,
+			"/f",
+		).Run()
+	}
+	return exec.Command("reg", "delete",
+		`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`,
+		"/v", "SC Bridge Companion",
+		"/f",
+	).Run()
 }

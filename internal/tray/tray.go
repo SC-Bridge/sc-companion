@@ -11,23 +11,24 @@ import (
 
 // Status holds the current companion app status for display.
 type Status struct {
-	PlayerHandle   string
-	CurrentShip    string
-	Location       string
-	Jurisdiction   string
-	EventCount     int
-	Connected      bool
-	LastEvent      time.Time
+	PlayerHandle string
+	CurrentShip  string
+	Location     string
+	Jurisdiction string
+	EventCount   int
+	Connected    bool
+	LastEvent    time.Time
 }
 
 // Controller manages the system tray state and exposes status for UI.
 // The actual systray integration is Windows-specific and will use
 // platform-specific build tags. This controller is the shared logic.
 type Controller struct {
-	bus    *events.Bus
-	store  *store.Store
-	status Status
-	onQuit func()
+	bus         *events.Bus
+	store       *store.Store
+	status      Status
+	activeShips []string // ordered: most recently boarded last
+	onQuit      func()
 }
 
 // NewController creates a tray controller.
@@ -79,10 +80,36 @@ func (c *Controller) handleEvent(evt events.Event) {
 		slog.Info("player identified", "handle", c.status.PlayerHandle)
 
 	case "ship_boarded":
-		c.status.CurrentShip = evt.Data["ship"]
+		ship := evt.Data["ship"]
+		// Add to active set if not already present
+		found := false
+		for _, s := range c.activeShips {
+			if s == ship {
+				found = true
+				break
+			}
+		}
+		if !found {
+			c.activeShips = append(c.activeShips, ship)
+		}
+		c.status.CurrentShip = ship
 
 	case "ship_exited":
-		c.status.CurrentShip = ""
+		ship := evt.Data["ship"]
+		// Remove from active set
+		updated := c.activeShips[:0]
+		for _, s := range c.activeShips {
+			if s != ship {
+				updated = append(updated, s)
+			}
+		}
+		c.activeShips = updated
+		// Current ship is the most recently boarded one still active
+		if len(c.activeShips) > 0 {
+			c.status.CurrentShip = c.activeShips[len(c.activeShips)-1]
+		} else {
+			c.status.CurrentShip = ""
+		}
 
 	case "location_change":
 		c.status.Location = evt.Data["location"]
