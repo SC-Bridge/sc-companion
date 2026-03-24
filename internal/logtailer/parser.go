@@ -443,6 +443,198 @@ func NewParser() *Parser {
 				}
 			},
 		},
+
+		// --- Mission / contract lifecycle ---
+
+		// Contract shared by party member
+		{
+			name: "contract_shared",
+			re:   regexp.MustCompile(`Added notification "Contract Shared:\s*(.+?):\s*"`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "contract_shared", Source: "log",
+					Data: map[string]string{"name": strings.TrimSpace(m[1])},
+				}
+			},
+		},
+		// Objective completed
+		{
+			name: "objective_complete",
+			re:   regexp.MustCompile(`Added notification "Objective Complete:\s*(.+?):\s*"`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "objective_complete", Source: "log",
+					Data: map[string]string{"description": strings.TrimSpace(m[1])},
+				}
+			},
+		},
+		// Objective withdrawn
+		{
+			name: "objective_withdrawn",
+			re:   regexp.MustCompile(`Added notification "Objective Withdrawn:\s*(.+?):\s*"`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "objective_withdrawn", Source: "log",
+					Data: map[string]string{"description": strings.TrimSpace(m[1])},
+				}
+			},
+		},
+
+		// --- Zone / area transitions ---
+
+		// Armistice zone — exiting (distinct wording from "Leaving")
+		{
+			name: "armistice_exiting",
+			re:   regexp.MustCompile(`Added notification "Exiting Armistice Zone`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "armistice_exiting", Source: "log", Data: map[string]string{}}
+			},
+		},
+		// Private property
+		{
+			name: "private_property_entered",
+			re:   regexp.MustCompile(`Added notification "Entering Private Property`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "private_property_entered", Source: "log", Data: map[string]string{}}
+			},
+		},
+		{
+			name: "private_property_exited",
+			re:   regexp.MustCompile(`Added notification "Leaving Private Property`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "private_property_exited", Source: "log", Data: map[string]string{}}
+			},
+		},
+		// Restricted area
+		{
+			name: "restricted_area_warning",
+			re:   regexp.MustCompile(`Added notification "Restricted Area - Vehicles Will Be Impounded`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "restricted_area_warning", Source: "log", Data: map[string]string{}}
+			},
+		},
+		{
+			name: "restricted_area_exited",
+			re:   regexp.MustCompile(`Added notification "Leaving Restricted Area`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "restricted_area_exited", Source: "log", Data: map[string]string{}}
+			},
+		},
+		// Monitored space infrastructure
+		{
+			name: "monitored_space_down",
+			re:   regexp.MustCompile(`Added notification "Monitored Space Down`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "monitored_space_down", Source: "log", Data: map[string]string{}}
+			},
+		},
+		{
+			name: "monitored_space_restored",
+			re:   regexp.MustCompile(`Added notification "Monitored Space Restored`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "monitored_space_restored", Source: "log", Data: map[string]string{}}
+			},
+		},
+
+		// --- Crime ---
+
+		{
+			name: "crime_committed",
+			re:   regexp.MustCompile(`Added notification "Crime Committed:\s*(.+?):\s*"`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "crime_committed", Source: "log",
+					Data: map[string]string{"crime": strings.TrimSpace(m[1])},
+				}
+			},
+		},
+
+		// --- Party ---
+
+		{
+			name: "party_member_joined",
+			re:   regexp.MustCompile(`Added notification "New Member Joined`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "party_member_joined", Source: "log", Data: map[string]string{}}
+			},
+		},
+		{
+			name: "party_member_left",
+			re:   regexp.MustCompile(`Added notification "Member Left`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "party_member_left", Source: "log", Data: map[string]string{}}
+			},
+		},
+		{
+			name: "party_disbanded",
+			re:   regexp.MustCompile(`Added notification "Party Disbanded`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "party_disbanded", Source: "log", Data: map[string]string{}}
+			},
+		},
+
+		// --- Misc notifications ---
+
+		{
+			name: "low_fuel",
+			re:   regexp.MustCompile(`Added notification "Low Fuel`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "low_fuel", Source: "log", Data: map[string]string{}}
+			},
+		},
+		{
+			name: "journal_entry_added",
+			re:   regexp.MustCompile(`Added notification "Journal Entry Added:\s*(.+?):\s*"`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "journal_entry_added", Source: "log",
+					Data: map[string]string{"entry": strings.TrimSpace(m[1])},
+				}
+			},
+		},
+
+		// --- Player state (non-notification) ---
+
+		// Player spawned / respawned into the world
+		{
+			name: "player_spawned",
+			re:   regexp.MustCompile(`\[CSessionManager::OnClientSpawned\] Spawned!`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "player_spawned", Source: "log", Data: map[string]string{}}
+			},
+		},
+		// Actor death — fires when the local player dies inside a destroyed vehicle zone
+		{
+			name: "actor_death",
+			re:   regexp.MustCompile(`<\[ActorState\] Dead>.*Actor '([^']+)'.*ejected from zone '([^']+)'`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "actor_death", Source: "log",
+					Data: map[string]string{"actor": m[1], "zone": m[2]},
+				}
+			},
+		},
+		// Medical bed treatment
+		{
+			name: "med_bed_heal",
+			re:   regexp.MustCompile(`<MED BED HEAL> Actor: (\S+).*med bed name: ([^,]+), vehicle name: ([^,]+), head: (true|false) torso: (true|false) leftArm: (true|false) rightArm: (true|false) leftLeg: (true|false) rightLeg: (true|false)`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "med_bed_heal", Source: "log",
+					Data: map[string]string{
+						"actor":      m[1],
+						"bed_name":   strings.TrimSpace(m[2]),
+						"vehicle":    strings.TrimSpace(m[3]),
+						"head":       m[4],
+						"torso":      m[5],
+						"left_arm":   m[6],
+						"right_arm":  m[7],
+						"left_leg":   m[8],
+						"right_leg":  m[9],
+					},
+				}
+			},
+		},
 	}
 	return p
 }
