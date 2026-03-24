@@ -40,6 +40,9 @@ build/
 !build/windows/wails.exe.manifest
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
 sc-companion
+.codereview/
+codereview.md
+frontend/package.json.md5
