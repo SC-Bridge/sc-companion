@@ -307,7 +307,7 @@ func NewParser() *Parser {
 		// Rewards earned
 		{
 			name: "rewards_earned",
-			re:   regexp.MustCompile(`Added notification "You've Earned:\s*(\d+)\s+Rewards`),
+			re:   regexp.MustCompile(`Added notification "You've earned:\s*(\d+)\s+rewards`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "rewards_earned", Source: "log",
