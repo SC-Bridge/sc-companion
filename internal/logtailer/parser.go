@@ -12,7 +12,8 @@ import (
 type Parser struct {
 	patterns []pattern
 	// Multi-line notification accumulator
-	pendingNotification string
+	pendingType string
+	pendingData map[string]string
 }
 
 type pattern struct {
@@ -562,18 +563,42 @@ func NewParser() *Parser {
 
 		// --- Party ---
 
+		// Line 1: header — sets pending state
 		{
 			name: "party_member_joined",
 			re:   regexp.MustCompile(`Added notification "New Member Joined`),
 			extract: func(m []string) events.Event {
-				return events.Event{Type: "party_member_joined", Source: "log", Data: map[string]string{}}
+				return events.Event{Type: "party_member_joined_pending", Source: "log", Data: map[string]string{}}
 			},
 		},
+		// Line 2 continuation: "<ts> PlayerName has joined the channel/group/party"
+		{
+			name: "party_join_continuation",
+			re:   regexp.MustCompile(`^<[^>]+>\s+(\S+) has joined (?:the (?:channel|group) '|the party\.)`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "party_join_continuation", Source: "log",
+					Data: map[string]string{"player": m[1]},
+				}
+			},
+		},
+		// Line 1: header — sets pending state
 		{
 			name: "party_member_left",
 			re:   regexp.MustCompile(`Added notification "Member Left`),
 			extract: func(m []string) events.Event {
-				return events.Event{Type: "party_member_left", Source: "log", Data: map[string]string{}}
+				return events.Event{Type: "party_member_left_pending", Source: "log", Data: map[string]string{}}
+			},
+		},
+		// Line 2 continuation: "<ts> PlayerName has left the party."
+		{
+			name: "party_left_continuation",
+			re:   regexp.MustCompile(`^<[^>]+>\s+(\S+) has left the party\.`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "party_left_continuation", Source: "log",
+					Data: map[string]string{"player": m[1]},
+				}
 			},
 		},
 		{
@@ -660,8 +685,8 @@ func (p *Parser) PatternNames() []string {
 }
 
 // Parse attempts to extract an event from a log line.
-// It handles multi-line money_sent notifications by buffering the recipient
-// from the first line and combining it with the amount on the next.
+// Some notifications span two log lines; Parse buffers state from line 1
+// and emits the final event when the continuation line is matched.
 func (p *Parser) Parse(line string) (events.Event, bool) {
 	// Extract timestamp if present
 	ts := extractTimestamp(line)
@@ -675,34 +700,71 @@ func (p *Parser) Parse(line string) (events.Event, bool) {
 		evt.Timestamp = ts
 
 		switch evt.Type {
+
+		// --- money_sent (2-line) ---
 		case "money_sent_pending":
-			// Buffer recipient; wait for the amount line immediately following.
-			p.pendingNotification = evt.Data["recipient"]
+			p.pendingType = "money_sent"
+			p.pendingData = map[string]string{"recipient": evt.Data["recipient"]}
 			return events.Event{}, false
 		case "money_amount":
-			if p.pendingNotification == "" {
-				// Amount line repeated by UpdateNotificationItem — ignore.
+			if p.pendingType != "money_sent" {
 				return events.Event{}, false
 			}
 			out := events.Event{
-				Type:      "money_sent",
-				Source:    "log",
-				Timestamp: ts,
+				Type: "money_sent", Source: "log", Timestamp: ts,
 				Data: map[string]string{
-					"recipient": p.pendingNotification,
+					"recipient": p.pendingData["recipient"],
 					"amount":    evt.Data["amount"],
 					"currency":  "aUEC",
 				},
 			}
-			p.pendingNotification = ""
+			p.clearPending()
 			return out, true
+
+		// --- party_member_joined (2-line) ---
+		case "party_member_joined_pending":
+			p.pendingType = "party_member_joined"
+			p.pendingData = map[string]string{}
+			return events.Event{}, false
+		case "party_join_continuation":
+			if p.pendingType != "party_member_joined" {
+				return events.Event{}, false
+			}
+			out := events.Event{
+				Type: "party_member_joined", Source: "log", Timestamp: ts,
+				Data: map[string]string{"player": evt.Data["player"]},
+			}
+			p.clearPending()
+			return out, true
+
+		// --- party_member_left (2-line) ---
+		case "party_member_left_pending":
+			p.pendingType = "party_member_left"
+			p.pendingData = map[string]string{}
+			return events.Event{}, false
+		case "party_left_continuation":
+			if p.pendingType != "party_member_left" {
+				return events.Event{}, false
+			}
+			out := events.Event{
+				Type: "party_member_left", Source: "log", Timestamp: ts,
+				Data: map[string]string{"player": evt.Data["player"]},
+			}
+			p.clearPending()
+			return out, true
+
 		default:
 			// Any other matched event clears stale pending state.
-			p.pendingNotification = ""
+			p.clearPending()
 			return evt, true
 		}
 	}
 	return events.Event{}, false
+}
+
+func (p *Parser) clearPending() {
+	p.pendingType = ""
+	p.pendingData = nil
 }
 
 // parseShipChannel splits "Manufacturer Ship : Owner" into ship and owner.
