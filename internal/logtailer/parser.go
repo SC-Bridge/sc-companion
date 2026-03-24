@@ -196,10 +196,10 @@ func NewParser() *Parser {
 				}
 			},
 		},
-		// Money amount line (continuation of money_sent)
+		// Money amount line (continuation of money_sent) — format: "<timestamp> 7035000 aUEC"
 		{
 			name: "money_amount",
-			re:   regexp.MustCompile(`^\s*(\d+)\s+aUEC\s*$`),
+			re:   regexp.MustCompile(`^<[^>]+>\s+(\d+)\s+aUEC\s*$`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "money_amount", Source: "log",
@@ -640,15 +640,45 @@ func NewParser() *Parser {
 }
 
 // Parse attempts to extract an event from a log line.
+// It handles multi-line money_sent notifications by buffering the recipient
+// from the first line and combining it with the amount on the next.
 func (p *Parser) Parse(line string) (events.Event, bool) {
 	// Extract timestamp if present
 	ts := extractTimestamp(line)
 
 	for _, pat := range p.patterns {
 		matches := pat.re.FindStringSubmatch(line)
-		if matches != nil {
-			evt := pat.extract(matches)
-			evt.Timestamp = ts
+		if matches == nil {
+			continue
+		}
+		evt := pat.extract(matches)
+		evt.Timestamp = ts
+
+		switch evt.Type {
+		case "money_sent_pending":
+			// Buffer recipient; wait for the amount line immediately following.
+			p.pendingNotification = evt.Data["recipient"]
+			return events.Event{}, false
+		case "money_amount":
+			if p.pendingNotification == "" {
+				// Amount line repeated by UpdateNotificationItem — ignore.
+				return events.Event{}, false
+			}
+			out := events.Event{
+				Type:      "money_sent",
+				Source:    "log",
+				Timestamp: ts,
+				Data: map[string]string{
+					"recipient": p.pendingNotification,
+					"amount":    evt.Data["amount"],
+					"currency":  "aUEC",
+				},
+			}
+			p.pendingNotification = ""
+			return out, true
+		default:
+			// Any other matched event clears stale pending state.
+			p.pendingNotification = ""
 			return evt, true
 		}
 	}

@@ -55,7 +55,7 @@ type EventCategory struct {
 	Events []EventCategoryEntry `json:"events"`
 }
 
-// EventCategories returns all 40 event types grouped into 8 categories.
+// EventCategories returns all known event types grouped into categories.
 func EventCategories() []EventCategory {
 	return []EventCategory{
 		{
@@ -63,6 +63,8 @@ func EventCategories() []EventCategory {
 			Events: []EventCategoryEntry{
 				{Type: "player_login", Label: "Player Login"},
 				{Type: "server_joined", Label: "Server Joined"},
+				{Type: "player_spawned", Label: "Player Spawned"},
+				{Type: "entitlement_reconciliation", Label: "Entitlement Reconciliation"},
 			},
 		},
 		{
@@ -76,7 +78,8 @@ func EventCategories() []EventCategory {
 				{Type: "hangar_ready", Label: "Hangar Ready"},
 				{Type: "ship_list_fetched", Label: "Ship List Fetched"},
 				{Type: "ships_loaded", Label: "Ships Loaded"},
-				{Type: "entitlement_reconciliation", Label: "Entitlement Reconciliation"},
+				{Type: "fatal_collision", Label: "Fatal Collision"},
+				{Type: "low_fuel", Label: "Low Fuel"},
 			},
 		},
 		{
@@ -86,9 +89,12 @@ func EventCategories() []EventCategory {
 				{Type: "contract_completed", Label: "Contract Completed"},
 				{Type: "contract_failed", Label: "Contract Failed"},
 				{Type: "contract_available", Label: "Contract Available"},
+				{Type: "contract_shared", Label: "Contract Shared"},
 				{Type: "mission_ended", Label: "Mission Ended"},
 				{Type: "end_mission", Label: "End Mission"},
 				{Type: "new_objective", Label: "New Objective"},
+				{Type: "objective_complete", Label: "Objective Complete"},
+				{Type: "objective_withdrawn", Label: "Objective Withdrawn"},
 			},
 		},
 		{
@@ -98,15 +104,21 @@ func EventCategories() []EventCategory {
 				{Type: "jurisdiction_entered", Label: "Jurisdiction Entered"},
 				{Type: "armistice_entered", Label: "Armistice Entered"},
 				{Type: "armistice_exited", Label: "Armistice Exited"},
+				{Type: "armistice_exiting", Label: "Armistice Exiting"},
 				{Type: "monitored_space_entered", Label: "Monitored Space Entered"},
 				{Type: "monitored_space_exited", Label: "Monitored Space Exited"},
+				{Type: "monitored_space_down", Label: "Monitored Space Down"},
+				{Type: "monitored_space_restored", Label: "Monitored Space Restored"},
+				{Type: "private_property_entered", Label: "Private Property Entered"},
+				{Type: "private_property_exited", Label: "Private Property Exited"},
+				{Type: "restricted_area_warning", Label: "Restricted Area Warning"},
+				{Type: "restricted_area_exited", Label: "Restricted Area Exited"},
 			},
 		},
 		{
 			Name: "Quantum Travel",
 			Events: []EventCategoryEntry{
 				{Type: "qt_target_selected", Label: "Target Selected"},
-				{Type: "qt_destination_selected", Label: "Destination Selected"},
 				{Type: "qt_fuel_requested", Label: "Fuel Requested"},
 				{Type: "qt_arrived", Label: "Arrived"},
 			},
@@ -115,12 +127,10 @@ func EventCategories() []EventCategory {
 			Name: "Economy",
 			Events: []EventCategoryEntry{
 				{Type: "money_sent", Label: "Money Sent"},
-				{Type: "money_sent_pending", Label: "Money Pending"},
 				{Type: "fined", Label: "Fined"},
 				{Type: "transaction_complete", Label: "Transaction Complete"},
 				{Type: "rewards_earned", Label: "Rewards Earned"},
 				{Type: "refinery_complete", Label: "Refinery Complete"},
-				{Type: "blueprint_received", Label: "Blueprint Received"},
 			},
 		},
 		{
@@ -128,15 +138,20 @@ func EventCategories() []EventCategory {
 			Events: []EventCategoryEntry{
 				{Type: "injury", Label: "Injury"},
 				{Type: "incapacitated", Label: "Incapacitated"},
-				{Type: "fatal_collision", Label: "Fatal Collision"},
+				{Type: "actor_death", Label: "Actor Death"},
+				{Type: "med_bed_heal", Label: "Med Bed Heal"},
 				{Type: "crimestat_increased", Label: "CrimeStat Increased"},
+				{Type: "crime_committed", Label: "Crime Committed"},
 				{Type: "emergency_services", Label: "Emergency Services"},
+				{Type: "journal_entry_added", Label: "Journal Entry Added"},
 			},
 		},
 		{
-			Name: "System",
+			Name: "Party",
 			Events: []EventCategoryEntry{
-				{Type: "money_amount", Label: "Money Amount (internal)"},
+				{Type: "party_member_joined", Label: "Member Joined"},
+				{Type: "party_member_left", Label: "Member Left"},
+				{Type: "party_disbanded", Label: "Party Disbanded"},
 			},
 		},
 	}
