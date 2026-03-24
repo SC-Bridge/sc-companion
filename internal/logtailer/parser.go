@@ -414,17 +414,6 @@ func NewParser() *Parser {
 
 		// --- New patterns: quantum travel ---
 
-		// QT destination selected
-		{
-			name: "qt_destination_selected",
-			re:   regexp.MustCompile(`<Player Selected Quantum Target - Local>.*destination (\S+)`),
-			extract: func(m []string) events.Event {
-				return events.Event{
-					Type: "qt_destination_selected", Source: "log",
-					Data: map[string]string{"destination": m[1]},
-				}
-			},
-		},
 		// QT fuel requested
 		{
 			name: "qt_fuel_requested",
@@ -434,14 +423,6 @@ func NewParser() *Parser {
 					Type: "qt_fuel_requested", Source: "log",
 					Data: map[string]string{"destination": m[1]},
 				}
-			},
-		},
-		// QT arrived (more specific version)
-		{
-			name: "qt_arrived_final",
-			re:   regexp.MustCompile(`<Quantum Drive Arrived - Arrived at Final Destination>`),
-			extract: func(m []string) events.Event {
-				return events.Event{Type: "qt_arrived", Source: "log", Data: map[string]string{}}
 			},
 		},
 
