@@ -39,7 +39,7 @@ func NewParser() *Parser {
 		// Ship boarding — "You have joined channel 'Ship Name : OwnerHandle'"
 		{
 			name: "ship_boarded",
-			re:   regexp.MustCompile(`Added notification "You have joined channel '(.+?)'"`),
+			re:   regexp.MustCompile(`Added notification "You have joined channel '(.+?)'`),
 			extract: func(m []string) events.Event {
 				channel := m[1]
 				ship, owner := parseShipChannel(channel)
@@ -52,7 +52,7 @@ func NewParser() *Parser {
 		// Ship exiting
 		{
 			name: "ship_exited",
-			re:   regexp.MustCompile(`Added notification "You have left the channel '(.+?)'"`),
+			re:   regexp.MustCompile(`Added notification "You have left the channel '(.+?)'`),
 			extract: func(m []string) events.Event {
 				channel := m[1]
 				ship, owner := parseShipChannel(channel)
@@ -471,7 +471,7 @@ func NewParser() *Parser {
 		// Objective completed
 		{
 			name: "objective_complete",
-			re:   regexp.MustCompile(`Added notification "Objective Complete:\s*(.+?):\s*"`),
+			re:   regexp.MustCompile(`Added notification "Objective Complete:\s*(.+?)(?::\s*"|$)`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "objective_complete", Source: "log",
@@ -551,7 +551,7 @@ func NewParser() *Parser {
 
 		{
 			name: "crime_committed",
-			re:   regexp.MustCompile(`Added notification "Crime Committed:\s*(.+?):\s*"`),
+			re:   regexp.MustCompile(`Added notification "Crime Committed:\s*(.+?)(?::\s*"|$)`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "crime_committed", Source: "log",
@@ -648,6 +648,15 @@ func NewParser() *Parser {
 		},
 	}
 	return p
+}
+
+// PatternNames returns the names of all registered patterns, in order.
+func (p *Parser) PatternNames() []string {
+	names := make([]string, len(p.patterns))
+	for i, pat := range p.patterns {
+		names[i] = pat.name
+	}
+	return names
 }
 
 // Parse attempts to extract an event from a log line.
