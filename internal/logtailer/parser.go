@@ -210,7 +210,7 @@ func NewParser() *Parser {
 		// Injury
 		{
 			name: "injury",
-			re:   regexp.MustCompile(`Added notification "(Minor|Major|Severe) Injury Detected - ([^-]+) - Tier (\d+)`),
+			re:   regexp.MustCompile(`Added notification "(Minor|Moderate|Major|Severe) Injury Detected - ([^-]+) - Tier (\d+)`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "injury", Source: "log",
