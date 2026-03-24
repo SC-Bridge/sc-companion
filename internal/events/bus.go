@@ -131,6 +131,7 @@ func EventCategories() []EventCategory {
 				{Type: "transaction_complete", Label: "Transaction Complete"},
 				{Type: "rewards_earned", Label: "Rewards Earned"},
 				{Type: "refinery_complete", Label: "Refinery Complete"},
+				{Type: "blueprint_received", Label: "Blueprint Received"},
 			},
 		},
 		{

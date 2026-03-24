@@ -252,6 +252,17 @@ func NewParser() *Parser {
 				}
 			},
 		},
+		// Blueprint received
+		{
+			name: "blueprint_received",
+			re:   regexp.MustCompile(`Added notification "Received Blueprint:\s*(.+?):\s*"`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "blueprint_received", Source: "log",
+					Data: map[string]string{"name": strings.TrimSpace(m[1])},
+				}
+			},
+		},
 		// Refinery complete
 		{
 			name: "refinery_complete",
