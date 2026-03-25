@@ -32,6 +32,7 @@ frontend/node_modules/
 frontend/dist/
 
 # Wails build output (keep icon + resource assets)
+build/bin/
 build/
 !build/appicon.png
 !build/windows/
