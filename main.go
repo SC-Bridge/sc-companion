@@ -23,19 +23,20 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title:     "SC Bridge Companion",
-		Width:     1400,
+		Width:     900,
 		Height:    950,
-		MinWidth:  900,
-		MinHeight: 600,
-		WindowStartState: options.Maximised,
+		MinWidth:  850,
+		MinHeight: 950,
+		WindowStartState: options.Normal,
 		BackgroundColour: &options.RGBA{
 			R: 9, G: 19, B: 31, A: 255, // #09131f — sc-darker
 		},
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		OnStartup:  app.startup,
-		OnShutdown: app.shutdown,
+		OnStartup:       app.startup,
+		OnShutdown:      app.shutdown,
+		OnBeforeClose:   app.beforeClose,
 		Bind: []interface{}{
 			app,
 		},

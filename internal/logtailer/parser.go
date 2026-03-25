@@ -12,7 +12,8 @@ import (
 type Parser struct {
 	patterns []pattern
 	// Multi-line notification accumulator
-	pendingNotification string
+	pendingType string
+	pendingData map[string]string
 }
 
 type pattern struct {
@@ -39,7 +40,7 @@ func NewParser() *Parser {
 		// Ship boarding — "You have joined channel 'Ship Name : OwnerHandle'"
 		{
 			name: "ship_boarded",
-			re:   regexp.MustCompile(`Added notification "You have joined channel '([^']+)'`),
+			re:   regexp.MustCompile(`Added notification "You have joined channel '(.+?)'`),
 			extract: func(m []string) events.Event {
 				channel := m[1]
 				ship, owner := parseShipChannel(channel)
@@ -52,7 +53,7 @@ func NewParser() *Parser {
 		// Ship exiting
 		{
 			name: "ship_exited",
-			re:   regexp.MustCompile(`Added notification "You have left the channel '([^']+)'`),
+			re:   regexp.MustCompile(`Added notification "You have left the channel '(.+?)'`),
 			extract: func(m []string) events.Event {
 				channel := m[1]
 				ship, owner := parseShipChannel(channel)
@@ -196,10 +197,10 @@ func NewParser() *Parser {
 				}
 			},
 		},
-		// Money amount line (continuation of money_sent)
+		// Money amount line (continuation of money_sent) — format: "<timestamp> 7035000 aUEC"
 		{
 			name: "money_amount",
-			re:   regexp.MustCompile(`^\s*(\d+)\s+aUEC\s*$`),
+			re:   regexp.MustCompile(`^<[^>]+>\s+(\d+)\s+aUEC\s*$`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "money_amount", Source: "log",
@@ -210,7 +211,7 @@ func NewParser() *Parser {
 		// Injury
 		{
 			name: "injury",
-			re:   regexp.MustCompile(`Added notification "(Minor|Major|Severe) Injury Detected - ([^-]+) - Tier (\d+)`),
+			re:   regexp.MustCompile(`Added notification "(Minor|Moderate|Major|Severe) Injury Detected - ([^-]+) - Tier (\d+)`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "injury", Source: "log",
@@ -252,10 +253,10 @@ func NewParser() *Parser {
 				}
 			},
 		},
-		// Blueprint received (4.7+)
+		// Blueprint received
 		{
 			name: "blueprint_received",
-			re:   regexp.MustCompile(`Added notification "Received Blueprint:\s*(.+?):`),
+			re:   regexp.MustCompile(`Added notification "Received Blueprint:\s*(.+?):\s*"`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "blueprint_received", Source: "log",
@@ -318,7 +319,7 @@ func NewParser() *Parser {
 		// Rewards earned
 		{
 			name: "rewards_earned",
-			re:   regexp.MustCompile(`Added notification "You've Earned:\s*(\d+)\s+Rewards`),
+			re:   regexp.MustCompile(`Added notification "You've earned:\s*(\d+)\s+rewards`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "rewards_earned", Source: "log",
@@ -414,17 +415,6 @@ func NewParser() *Parser {
 
 		// --- New patterns: quantum travel ---
 
-		// QT destination selected
-		{
-			name: "qt_destination_selected",
-			re:   regexp.MustCompile(`<Player Selected Quantum Target - Local>.*destination (\S+)`),
-			extract: func(m []string) events.Event {
-				return events.Event{
-					Type: "qt_destination_selected", Source: "log",
-					Data: map[string]string{"destination": m[1]},
-				}
-			},
-		},
 		// QT fuel requested
 		{
 			name: "qt_fuel_requested",
@@ -434,14 +424,6 @@ func NewParser() *Parser {
 					Type: "qt_fuel_requested", Source: "log",
 					Data: map[string]string{"destination": m[1]},
 				}
-			},
-		},
-		// QT arrived (more specific version)
-		{
-			name: "qt_arrived_final",
-			re:   regexp.MustCompile(`<Quantum Drive Arrived - Arrived at Final Destination>`),
-			extract: func(m []string) events.Event {
-				return events.Event{Type: "qt_arrived", Source: "log", Data: map[string]string{}}
 			},
 		},
 
@@ -473,24 +455,316 @@ func NewParser() *Parser {
 				}
 			},
 		},
+
+		// --- Mission / contract lifecycle ---
+
+		// Contract shared by party member
+		{
+			name: "contract_shared",
+			re:   regexp.MustCompile(`Added notification "Contract Shared:\s*(.+?):\s*"`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "contract_shared", Source: "log",
+					Data: map[string]string{"name": strings.TrimSpace(m[1])},
+				}
+			},
+		},
+		// Objective completed
+		{
+			name: "objective_complete",
+			re:   regexp.MustCompile(`Added notification "Objective Complete:\s*(.+?)(?::\s*"|$)`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "objective_complete", Source: "log",
+					Data: map[string]string{"description": strings.TrimSpace(m[1])},
+				}
+			},
+		},
+		// Objective withdrawn
+		{
+			name: "objective_withdrawn",
+			re:   regexp.MustCompile(`Added notification "Objective Withdrawn:\s*(.+?):\s*"`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "objective_withdrawn", Source: "log",
+					Data: map[string]string{"description": strings.TrimSpace(m[1])},
+				}
+			},
+		},
+
+		// --- Zone / area transitions ---
+
+		// Armistice zone — exiting (distinct wording from "Leaving")
+		{
+			name: "armistice_exiting",
+			re:   regexp.MustCompile(`Added notification "Exiting Armistice Zone`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "armistice_exiting", Source: "log", Data: map[string]string{}}
+			},
+		},
+		// Private property
+		{
+			name: "private_property_entered",
+			re:   regexp.MustCompile(`Added notification "Entering Private Property`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "private_property_entered", Source: "log", Data: map[string]string{}}
+			},
+		},
+		{
+			name: "private_property_exited",
+			re:   regexp.MustCompile(`Added notification "Leaving Private Property`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "private_property_exited", Source: "log", Data: map[string]string{}}
+			},
+		},
+		// Restricted area
+		{
+			name: "restricted_area_warning",
+			re:   regexp.MustCompile(`Added notification "Restricted Area - Vehicles Will Be Impounded`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "restricted_area_warning", Source: "log", Data: map[string]string{}}
+			},
+		},
+		{
+			name: "restricted_area_exited",
+			re:   regexp.MustCompile(`Added notification "Leaving Restricted Area`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "restricted_area_exited", Source: "log", Data: map[string]string{}}
+			},
+		},
+		// Monitored space infrastructure
+		{
+			name: "monitored_space_down",
+			re:   regexp.MustCompile(`Added notification "Monitored Space Down`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "monitored_space_down", Source: "log", Data: map[string]string{}}
+			},
+		},
+		{
+			name: "monitored_space_restored",
+			re:   regexp.MustCompile(`Added notification "Monitored Space Restored`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "monitored_space_restored", Source: "log", Data: map[string]string{}}
+			},
+		},
+
+		// --- Crime ---
+
+		{
+			name: "crime_committed",
+			re:   regexp.MustCompile(`Added notification "Crime Committed:\s*(.+?)(?::\s*"|$)`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "crime_committed", Source: "log",
+					Data: map[string]string{"crime": strings.TrimSpace(m[1])},
+				}
+			},
+		},
+
+		// --- Party ---
+
+		// Line 1: header — sets pending state
+		{
+			name: "party_member_joined",
+			re:   regexp.MustCompile(`Added notification "New Member Joined`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "party_member_joined_pending", Source: "log", Data: map[string]string{}}
+			},
+		},
+		// Line 2 continuation: "<ts> PlayerName has joined the channel/group/party"
+		{
+			name: "party_join_continuation",
+			re:   regexp.MustCompile(`^<[^>]+>\s+(\S+) has joined (?:the (?:channel|group) '|the party\.)`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "party_join_continuation", Source: "log",
+					Data: map[string]string{"player": m[1]},
+				}
+			},
+		},
+		// Line 1: header — sets pending state
+		{
+			name: "party_member_left",
+			re:   regexp.MustCompile(`Added notification "Member Left`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "party_member_left_pending", Source: "log", Data: map[string]string{}}
+			},
+		},
+		// Line 2 continuation: "<ts> PlayerName has left the party."
+		{
+			name: "party_left_continuation",
+			re:   regexp.MustCompile(`^<[^>]+>\s+(\S+) has left the party\.`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "party_left_continuation", Source: "log",
+					Data: map[string]string{"player": m[1]},
+				}
+			},
+		},
+		{
+			name: "party_disbanded",
+			re:   regexp.MustCompile(`Added notification "Party Disbanded`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "party_disbanded", Source: "log", Data: map[string]string{}}
+			},
+		},
+
+		// --- Misc notifications ---
+
+		{
+			name: "low_fuel",
+			re:   regexp.MustCompile(`Added notification "Low Fuel`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "low_fuel", Source: "log", Data: map[string]string{}}
+			},
+		},
+		{
+			name: "journal_entry_added",
+			re:   regexp.MustCompile(`Added notification "Journal Entry Added:\s*(.+?):\s*"`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "journal_entry_added", Source: "log",
+					Data: map[string]string{"entry": strings.TrimSpace(m[1])},
+				}
+			},
+		},
+
+		// --- Player state (non-notification) ---
+
+		// Player spawned / respawned into the world
+		{
+			name: "player_spawned",
+			re:   regexp.MustCompile(`\[CSessionManager::OnClientSpawned\] Spawned!`),
+			extract: func(m []string) events.Event {
+				return events.Event{Type: "player_spawned", Source: "log", Data: map[string]string{}}
+			},
+		},
+		// Actor death — fires when the local player dies inside a destroyed vehicle zone
+		{
+			name: "actor_death",
+			re:   regexp.MustCompile(`<\[ActorState\] Dead>.*Actor '([^']+)'.*ejected from zone '([^']+)'`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "actor_death", Source: "log",
+					Data: map[string]string{"actor": m[1], "zone": m[2]},
+				}
+			},
+		},
+		// Medical bed treatment
+		{
+			name: "med_bed_heal",
+			re:   regexp.MustCompile(`<MED BED HEAL> Actor: (\S+).*med bed name: ([^,]+), vehicle name: ([^,]+), head: (true|false) torso: (true|false) leftArm: (true|false) rightArm: (true|false) leftLeg: (true|false) rightLeg: (true|false)`),
+			extract: func(m []string) events.Event {
+				return events.Event{
+					Type: "med_bed_heal", Source: "log",
+					Data: map[string]string{
+						"actor":      m[1],
+						"bed_name":   strings.TrimSpace(m[2]),
+						"vehicle":    strings.TrimSpace(m[3]),
+						"head":       m[4],
+						"torso":      m[5],
+						"left_arm":   m[6],
+						"right_arm":  m[7],
+						"left_leg":   m[8],
+						"right_leg":  m[9],
+					},
+				}
+			},
+		},
 	}
 	return p
 }
 
+// PatternNames returns the names of all registered patterns, in order.
+func (p *Parser) PatternNames() []string {
+	names := make([]string, len(p.patterns))
+	for i, pat := range p.patterns {
+		names[i] = pat.name
+	}
+	return names
+}
+
 // Parse attempts to extract an event from a log line.
+// Some notifications span two log lines; Parse buffers state from line 1
+// and emits the final event when the continuation line is matched.
 func (p *Parser) Parse(line string) (events.Event, bool) {
 	// Extract timestamp if present
 	ts := extractTimestamp(line)
 
 	for _, pat := range p.patterns {
 		matches := pat.re.FindStringSubmatch(line)
-		if matches != nil {
-			evt := pat.extract(matches)
-			evt.Timestamp = ts
+		if matches == nil {
+			continue
+		}
+		evt := pat.extract(matches)
+		evt.Timestamp = ts
+
+		switch evt.Type {
+
+		// --- money_sent (2-line) ---
+		case "money_sent_pending":
+			p.pendingType = "money_sent"
+			p.pendingData = map[string]string{"recipient": evt.Data["recipient"]}
+			return events.Event{}, false
+		case "money_amount":
+			if p.pendingType != "money_sent" {
+				return events.Event{}, false
+			}
+			out := events.Event{
+				Type: "money_sent", Source: "log", Timestamp: ts,
+				Data: map[string]string{
+					"recipient": p.pendingData["recipient"],
+					"amount":    evt.Data["amount"],
+					"currency":  "aUEC",
+				},
+			}
+			p.clearPending()
+			return out, true
+
+		// --- party_member_joined (2-line) ---
+		case "party_member_joined_pending":
+			p.pendingType = "party_member_joined"
+			p.pendingData = map[string]string{}
+			return events.Event{}, false
+		case "party_join_continuation":
+			if p.pendingType != "party_member_joined" {
+				return events.Event{}, false
+			}
+			out := events.Event{
+				Type: "party_member_joined", Source: "log", Timestamp: ts,
+				Data: map[string]string{"player": evt.Data["player"]},
+			}
+			p.clearPending()
+			return out, true
+
+		// --- party_member_left (2-line) ---
+		case "party_member_left_pending":
+			p.pendingType = "party_member_left"
+			p.pendingData = map[string]string{}
+			return events.Event{}, false
+		case "party_left_continuation":
+			if p.pendingType != "party_member_left" {
+				return events.Event{}, false
+			}
+			out := events.Event{
+				Type: "party_member_left", Source: "log", Timestamp: ts,
+				Data: map[string]string{"player": evt.Data["player"]},
+			}
+			p.clearPending()
+			return out, true
+
+		default:
+			// Any other matched event clears stale pending state.
+			p.clearPending()
 			return evt, true
 		}
 	}
 	return events.Event{}, false
+}
+
+func (p *Parser) clearPending() {
+	p.pendingType = ""
+	p.pendingData = nil
 }
 
 // parseShipChannel splits "Manufacturer Ship : Owner" into ship and owner.

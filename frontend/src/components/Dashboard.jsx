@@ -80,7 +80,9 @@ function Dashboard({ status, config }) {
         <p className="text-gray-500 text-sm mt-1.5 tracking-wide">
           {status?.playerHandle
             ? `Welcome back, ${status.playerHandle}`
-            : 'Waiting for Star Citizen...'
+            : status?.tailerActive
+              ? 'Monitoring — waiting for player login...'
+              : 'Waiting for Star Citizen...'
           }
         </p>
       </div>

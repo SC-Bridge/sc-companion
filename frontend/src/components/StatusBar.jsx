@@ -16,8 +16,8 @@ function StatusBar({ status }) {
           </>
         ) : (
           <>
-            <WifiOff size={11} />
-            <span>No Log</span>
+            <WifiOff size={11} className="text-red-500" />
+            <span className="text-red-500/70">No Log</span>
           </>
         )}
       </div>
