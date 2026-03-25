@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question or share feedback
+    url: https://github.com/SC-Bridge/sc-companion/discussions
+    about: Not a bug? Start a Discussion instead — questions, ideas, and general feedback live there.
+  - name: Star Citizen game bugs or balance issues
+    url: https://issue-council.robertsspaceindustries.com/
+    about: SC Bridge shows game data as-is. Bugs in the game itself go to the RSI Issue Council.
