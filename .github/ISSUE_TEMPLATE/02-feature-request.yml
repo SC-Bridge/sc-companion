@@ -1,0 +1,47 @@
+name: Feature Request
+description: Suggest something you'd like to see in SC Companion
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea? Great. Feature requests help shape what gets built next.
+
+        Before submitting, check [Ideas in Discussions](https://github.com/SC-Bridge/sc-companion/discussions/categories/ideas) — your idea may already be there and you can upvote it instead.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of SC Companion would this improve?
+      options:
+        - Fleet (your ships list)
+        - Loot DB (item browser)
+        - Ship DB (ship reference data)
+        - Import
+        - Insurance
+        - Analysis
+        - Account / Login
+        - Organisations
+        - New feature area
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like SC Companion to do?
+      description: Describe the feature in plain terms. What does it do? What does it look like?
+      placeholder: e.g. "Show a grid view in the Loot DB with item icons so I can browse faster."
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would this be useful?
+      description: What problem does it solve? Who else might benefit?
+      placeholder: e.g. "Right now I have to scroll a long list. Visual scanning with icons would be much faster for checking what drops where."
+    validations:
+      required: true
+  - type: textarea
+    id: examples
+    attributes:
+      label: Any examples from other tools? (optional)
+      description: If another Star Citizen tool, game, or website does something similar, link it here.
