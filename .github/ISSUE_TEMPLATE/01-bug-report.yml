@@ -1,0 +1,85 @@
+name: Bug Report
+description: Something isn't working correctly in SC Companion
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. The more detail you include, the faster it gets fixed.
+
+        **Not a bug?** [Start a Discussion](https://github.com/SC-Bridge/sc-companion/discussions) for questions, ideas, or general feedback.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of SC Companion is affected?
+      options:
+        - Fleet (your ships list)
+        - Loot DB (item browser)
+        - Ship DB (ship reference data)
+        - Import (HangarXplor import)
+        - Insurance
+        - Analysis
+        - Account / Login
+        - Organisations
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe what went wrong. Be specific — "it's broken" is hard to fix.
+      placeholder: e.g. "After importing my hangar, my Carrack shows as LTI but the insurance tab shows 3-month."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      placeholder: e.g. "Insurance tab should show LTI to match what I imported."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Step-by-step so the bug can be reliably triggered.
+      placeholder: |
+        1. Go to...
+        2. Click...
+        3. See...
+    validations:
+      required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome / Chromium
+        - Firefox
+        - Safari
+        - Edge
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - Desktop
+        - Mobile (phone)
+        - Tablet
+    validations:
+      required: true
+  - type: input
+    id: sc-version
+    attributes:
+      label: Star Citizen version (if relevant)
+      description: Shown in-game on the launcher or PTU select screen. e.g. 4.6.0-live
+      placeholder: e.g. 4.6.0-live
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot or recording (optional)
+      description: Drag and drop an image or screen recording here. Often worth a thousand words.
