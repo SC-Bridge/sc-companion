@@ -32,6 +32,7 @@ frontend/node_modules/
 frontend/dist/
 
 # Wails build output (keep icon + resource assets)
+build/bin/
 build/
 !build/appicon.png
 !build/windows/
@@ -40,6 +41,9 @@ build/
 !build/windows/wails.exe.manifest
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
 sc-companion
+.codereview/
+codereview.md
+frontend/package.json.md5

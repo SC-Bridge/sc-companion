@@ -1,0 +1,5 @@
+log_path: ""
+api_endpoint: https://scbridge.app/api
+api_token: ""
+environment: production
+minimize_to_tray: true
