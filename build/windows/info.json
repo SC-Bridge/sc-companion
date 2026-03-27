@@ -1,18 +1,18 @@
 {
   "fixed": {
-    "file_version": "0.3.8"
+    "file_version": "0.3.9"
   },
   "info": {
     "0409": {
       "Comments": "Star Citizen companion app",
       "CompanyName": "SC Bridge",
       "FileDescription": "SC Bridge Companion",
-      "FileVersion": "0.3.8",
+      "FileVersion": "0.3.9",
       "InternalName": "SCBridgeCompanion",
       "LegalCopyright": "Copyright 2026 SC Bridge",
       "OriginalFilename": "SCBridgeCompanion.exe",
       "ProductName": "SC Bridge Companion",
-      "ProductVersion": "0.3.8"
+      "ProductVersion": "0.3.9"
     }
   }
 }
