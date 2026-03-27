@@ -212,11 +212,12 @@ function UpdateBanner({ info, onDismiss }) {
   const [error, setError] = useState(null)
 
   const handleUpdate = useCallback(async () => {
-    if (!wails || !info.downloadUrl) return
+    const updateUrl = info.installerUrl || info.downloadUrl
+    if (!wails || !updateUrl) return
     setUpdating(true)
     setError(null)
     try {
-      const err = await wails.ApplyUpdate(info.downloadUrl)
+      const err = await wails.ApplyUpdate(updateUrl)
       if (err) {
         setError(err)
         setUpdating(false)

@@ -14,6 +14,11 @@ import (
 	"time"
 )
 
+// isMSI returns true if the URL points to an MSI installer.
+func isMSI(url string) bool {
+	return strings.HasSuffix(strings.ToLower(url), ".msi")
+}
+
 // ApplyUpdate downloads the new version, replaces the current exe, and restarts.
 // This only works on Windows. Returns an error if something goes wrong before
 // the restart — if it succeeds, the process exits and never returns.
@@ -78,16 +83,31 @@ func ApplyUpdate(downloadURL string, quitFn func()) error {
 
 	slog.Info("self-update: downloaded", "path", newExePath)
 
-	// Use PowerShell to wait, replace, relaunch, and refresh icon cache — completely hidden
-	psScript := fmt.Sprintf(
-		`Start-Sleep -Seconds 2; `+
-			`Copy-Item -Force '%s' '%s'; `+
-			`Remove-Item -Force '%s'; `+
-			// Refresh icon cache without killing Explorer
-			`ie4uinit.exe -show; `+
-			`Start-Process '%s'`,
-		newExePath, currentExe, newExePath, currentExe,
-	)
+	var psScript string
+	if isMSI(downloadURL) {
+		// MSI install: msiexec handles UAC elevation via -Verb RunAs.
+		// Wait for it to finish, clean up, then relaunch from the same path
+		// (msiexec replaces the installed exe in place).
+		psScript = fmt.Sprintf(
+			`Start-Process msiexec -ArgumentList '/i','%s','/passive','/norestart' -Wait -Verb RunAs; `+
+				`Remove-Item -Force '%s'; `+
+				`ie4uinit.exe -show; `+
+				`Start-Process '%s'`,
+			newExePath, newExePath, currentExe,
+		)
+	} else {
+		// Portable exe: wait for this process to exit (by PID) before copying,
+		// avoiding the file-lock race that a fixed sleep can lose.
+		psScript = fmt.Sprintf(
+			`$p = Get-Process -Id %d -ErrorAction SilentlyContinue; `+
+				`if ($p) { $p.WaitForExit(30000) }; `+
+				`Copy-Item -Force '%s' '%s'; `+
+				`Remove-Item -Force '%s'; `+
+				`ie4uinit.exe -show; `+
+				`Start-Process '%s'`,
+			os.Getpid(), newExePath, currentExe, newExePath, currentExe,
+		)
+	}
 
 	cmd := exec.Command("powershell.exe", "-WindowStyle", "Hidden", "-Command", psScript)
 	cmd.Dir = tmpDir

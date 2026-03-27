@@ -35,6 +35,15 @@ Game.log
 
 ## Changelog
 
+### v0.3.9 (2026-03-27)
+- Fixed self-update silently failing for MSI installs in `C:\Program Files` — PowerShell ran without elevation so `Copy-Item` was denied. Now uses `msiexec /passive -Verb RunAs` which triggers a UAC prompt and installs correctly.
+- Fixed portable exe update timing race — replaced `Start-Sleep -Seconds 2` with `$p.WaitForExit(30000)` on the actual process PID so the file lock is guaranteed released before copy.
+- Frontend now prefers `installerUrl` over `downloadUrl` when both are available, routing MSI installs to the correct update path.
+
+### v0.3.8 (2026-03-26)
+- Investigated OAuth connection flow — root cause identified as a server-side change to `/companion/connect` page (JS fetch replacing traditional form submit, breaking the 302 redirect-to-localhost callback). App code is correct; fix required on scbridge.app website.
+- Identified bug: `ConnectToSCBridge` (app.go:604) assigns `svcCancel` to `a.cancel` instead of `a.syncCancel`, overwriting the app-level service context cancel. `startSync` corrects `a.syncCancel` itself so sync works, but shutdown cleanup is affected. Needs fix.
+
 ### v0.3.4 (2026-01-XX)
 - System tray support with minimize-to-tray
 - Startup on Windows login

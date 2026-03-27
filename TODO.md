@@ -61,6 +61,8 @@ Three events require 2-line parsing (pendingType/pendingData):
 
 ## Infrastructure / App
 
+- [ ] **Bug:** `ConnectToSCBridge` (app.go:604) — `a.cancel = svcCancel` should be `a.syncCancel = svcCancel`. Overwrites the app-level service context cancel set in startup. Sync works (startSync fixes syncCancel itself) but app shutdown doesn't cancel the original service context (tray, etc.).
+- [ ] **Website issue (scbridge.app):** `/companion/connect` Connect button changed from HTML form submit to JavaScript fetch — browser no longer follows the 302 redirect to `localhost:PORT/callback`, so the OAuth token never arrives. Fix on the website side: revert to a plain `<form method="POST">` with no JS interception.
 - [ ] Investigate whether `DetectedLogPath()` == `DetectGameLog()` — they're identical functions; one may be redundant
 - [ ] `config.go` strategy comment says "Strategy 1" twice (running process and registry) — minor documentation inconsistency
 
