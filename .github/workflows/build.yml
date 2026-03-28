@@ -45,7 +45,7 @@ jobs:
       - name: Prepare portable exe
         shell: pwsh
         run: |
-          Copy-Item "build\bin\SCBridgeCompanion.exe" "SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-portable.exe"
+          Copy-Item "build\bin\SCBridgeCompanion.exe" "SCBridgeCompanion-portable.exe"
 
       - name: Install WiX Toolset
         run: dotnet tool install --global wix --version "4.*"
@@ -58,7 +58,7 @@ jobs:
           wix extension add WixToolset.UI.wixext/4.0.5
           wix build installer.wxs `
             -ext WixToolset.UI.wixext `
-            -o "..\SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-setup.msi" `
+            -o "..\SCBridgeCompanion-setup.msi" `
             -arch x64
 
       # Upload unsigned artifacts for SignPath (or direct release if signing not configured)
@@ -68,8 +68,8 @@ jobs:
         with:
           name: unsigned-binaries
           path: |
-            SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-portable.exe
-            SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-setup.msi
+            SCBridgeCompanion-portable.exe
+            SCBridgeCompanion-setup.msi
 
       # SignPath code signing (skipped until SIGNPATH_ORGANIZATION_ID is configured)
       - name: Sign artifacts with SignPath
@@ -95,8 +95,8 @@ jobs:
           } else {
             Write-Host "Using unsigned artifacts (signing not configured)"
             New-Item -ItemType Directory -Path "release" -Force | Out-Null
-            Copy-Item "SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-portable.exe" "release\"
-            Copy-Item "SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-setup.msi" "release\"
+            Copy-Item "SCBridgeCompanion-portable.exe" "release\"
+            Copy-Item "SCBridgeCompanion-setup.msi" "release\"
           }
           Copy-Item "LICENSE" "release\"
 
@@ -104,8 +104,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-portable.exe
-            release/SCBridgeCompanion-${{ steps.version.outputs.VERSION }}-setup.msi
+            release/SCBridgeCompanion-portable.exe
+            release/SCBridgeCompanion-setup.msi
             release/LICENSE
           generate_release_notes: true
           draft: false
