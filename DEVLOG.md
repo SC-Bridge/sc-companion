@@ -36,6 +36,7 @@ Game.log
 ## Changelog
 
 ### Unreleased (2026-03-29)
+- Fixed wrong icon in Windows Settings → Installed Apps — `ARPPRODUCTICON` was not set in `installer.wxs`, causing Windows to fall back to a generic icon. Added `Icon` element + `ARPPRODUCTICON` property and copy `build/windows/icon.ico` into the installer directory in CI before the WiX build step.
 - Fixed console window flashing briefly every time Settings tab was opened — `GetStartWithWindows` / `SetStartWithWindows` were spawning `reg.exe` as a child process. Replaced with direct `golang.org/x/sys/windows/registry` API calls.
 - Clarified character identity vs personal identity in About tab — renamed "Player Identity" → "Character Identity", updated field labels and privacy note to make explicit that handle/GEID identify the in-game avatar, not the person.
 - Fixed MSI installer registering wrong version in Windows Apps list (was showing 0.3.9.0 even when installing v0.3.12 MSI from GitHub release).

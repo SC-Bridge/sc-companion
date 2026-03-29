@@ -71,6 +71,7 @@ Three events require 2-line parsing (pendingType/pendingData):
 
 ## Completed
 
+- [x] Fixed wrong icon in Windows Installed Apps — added ARPPRODUCTICON to WiX installer (2026-03-29)
 - [x] Fixed console window flash on Settings open — replaced reg.exe exec with registry API (2026-03-29)
 - [x] Clarified character vs personal identity in About tab (2026-03-29)
 - [x] Fixed MSI version mismatch — WiX now takes version from git tag via `-d ProductVersion=` instead of PE FileVersion binding (2026-03-29)
