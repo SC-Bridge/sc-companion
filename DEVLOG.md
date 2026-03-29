@@ -35,6 +35,20 @@ Game.log
 
 ## Changelog
 
+### Unreleased (2026-03-29)
+- Fixed MSI installer registering wrong version in Windows Apps list (was showing 0.3.9.0 even when installing v0.3.12 MSI from GitHub release).
+  - Root cause: WiX `Version="!(bind.FileVersion.MainExecutable)"` binds to the PE FileVersion resource, which Wails does not reliably update from `wails.json productVersion` when built with `-ldflags`.
+  - Fix: changed `installer.wxs` to use `Version="$(ProductVersion)"` (a WiX define) and added `-d ProductVersion=<tag>` to the CI `wix build` command so the version flows directly from the git tag with no PE resource dependency.
+
+### Unreleased (2026-03-29)
+- Analysed SC-Log-Samples corpus (~180 files, 5 named players) to catalogue everything Star Citizen writes to `Game.log` at startup and during play — player identity, full hardware specs, local IPs, input/audio/VR devices, overlay software, build info.
+- Added `docs/log-data-reference.md` — anonymised reference of all data categories in the log, what the companion reads, and what gets synced.
+- Added **About tab** (`frontend/src/components/About.jsx`):
+  - Stats row: total event types tracked, synced count, local-only count
+  - "What Lives in Game.log" — accordion with 8 data categories (Identity, Hardware, Network, Build, Input, Audio, VR, Overlays); each field shows read/not-read and sync status
+  - "Events Tracked by Companion" — all 8 event categories expandable, each event shows fields captured and SYNC/LOCAL badge
+  - Privacy note explicitly listing data classes that never leave the machine
+
 ### v0.3.9 (2026-03-27)
 - Fixed self-update silently failing for MSI installs in `C:\Program Files` — PowerShell ran without elevation so `Copy-Item` was denied. Now uses `msiexec /passive -Verb RunAs` which triggers a UAC prompt and installs correctly.
 - Fixed portable exe update timing race — replaced `Start-Sleep -Seconds 2` with `$p.WaitForExit(30000)` on the actual process PID so the file lock is guaranteed released before copy.

@@ -6,6 +6,7 @@
 
 - [ ] Review `SyncWorthyTypes` in `bus.go` — new events from today's parser work may be worth syncing (e.g. `crime_committed`, `actor_death`, `objective_complete`)
 - [ ] Frontend: surface new event types in the dashboard (19 new types added, UI categories already updated in `EventCategories()`)
+- [ ] About tab: keep `SYNC_WORTHY` set in `About.jsx` in sync with `bus.go` `SyncWorthyTypes` — currently duplicated; consider exposing via a `GetSyncWorthyTypes` Wails binding
 
 ---
 
@@ -70,6 +71,10 @@ Three events require 2-line parsing (pendingType/pendingData):
 
 ## Completed
 
+- [x] Fixed MSI version mismatch — WiX now takes version from git tag via `-d ProductVersion=` instead of PE FileVersion binding (2026-03-29)
+- [x] SC-Log-Samples corpus analysis — catalogued all data categories in `Game.log` (2026-03-29)
+- [x] Added `docs/log-data-reference.md` — anonymised log data reference (2026-03-29)
+- [x] Added About tab with log data inventory and event tracking reference (2026-03-29)
 - [x] Parser audit against 180 log files (2026-03-24)
 - [x] Fix `rewards_earned` case mismatch
 - [x] Fix `injury` missing `Moderate` severity

@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard'
 import EventFeed from './components/EventFeed'
 import Friends from './components/Friends'
 import Settings from './components/Settings'
+import About from './components/About'
 import EnvironmentSwitcher from './components/EnvironmentSwitcher'
 
 // Wails runtime bindings
@@ -15,6 +16,7 @@ const TABS = [
   { id: 'events', label: 'Events' },
   { id: 'friends', label: 'Friends' },
   { id: 'settings', label: 'Settings' },
+  { id: 'about', label: 'About' },
 ]
 
 function App() {
@@ -192,6 +194,7 @@ function App() {
         {activeTab === 'events' && <EventFeed events={events} />}
         {activeTab === 'friends' && <Friends config={config} />}
         {activeTab === 'settings' && <Settings config={config} onConfigChange={setConfig} onUpdateFound={setUpdateInfo} />}
+        {activeTab === 'about' && <About />}
       </main>
 
       <StatusBar status={status} />
