@@ -71,6 +71,8 @@ Three events require 2-line parsing (pendingType/pendingData):
 
 ## Completed
 
+- [x] Fixed console window flash on Settings open — replaced reg.exe exec with registry API (2026-03-29)
+- [x] Clarified character vs personal identity in About tab (2026-03-29)
 - [x] Fixed MSI version mismatch — WiX now takes version from git tag via `-d ProductVersion=` instead of PE FileVersion binding (2026-03-29)
 - [x] SC-Log-Samples corpus analysis — catalogued all data categories in `Game.log` (2026-03-29)
 - [x] Added `docs/log-data-reference.md` — anonymised log data reference (2026-03-29)

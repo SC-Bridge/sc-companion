@@ -36,6 +36,8 @@ Game.log
 ## Changelog
 
 ### Unreleased (2026-03-29)
+- Fixed console window flashing briefly every time Settings tab was opened — `GetStartWithWindows` / `SetStartWithWindows` were spawning `reg.exe` as a child process. Replaced with direct `golang.org/x/sys/windows/registry` API calls.
+- Clarified character identity vs personal identity in About tab — renamed "Player Identity" → "Character Identity", updated field labels and privacy note to make explicit that handle/GEID identify the in-game avatar, not the person.
 - Fixed MSI installer registering wrong version in Windows Apps list (was showing 0.3.9.0 even when installing v0.3.12 MSI from GitHub release).
   - Root cause: WiX `Version="!(bind.FileVersion.MainExecutable)"` binds to the PE FileVersion resource, which Wails does not reliably update from `wails.json productVersion` when built with `-ldflags`.
   - Fix: changed `installer.wxs` to use `Version="$(ProductVersion)"` (a WiX define) and added `-d ProductVersion=<tag>` to the CI `wix build` command so the version flows directly from the git tag with no PE resource dependency.
