@@ -19,7 +19,16 @@ jobs:
       - name: Extract version from tag
         id: version
         shell: bash
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          FULL="${GITHUB_REF#refs/tags/v}"
+          SEMVER="${FULL%%-*}"
+          echo "VERSION=$FULL" >> $GITHUB_OUTPUT
+          echo "MSI_VERSION=$SEMVER" >> $GITHUB_OUTPUT
+          if [[ "$FULL" == *-* ]]; then
+            echo "PRERELEASE=true" >> $GITHUB_OUTPUT
+          else
+            echo "PRERELEASE=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -58,7 +67,7 @@ jobs:
           wix extension add WixToolset.UI.wixext/4.0.5
           wix build installer.wxs `
             -ext WixToolset.UI.wixext `
-            -d ProductVersion=${{ steps.version.outputs.VERSION }} `
+            -d ProductVersion=${{ steps.version.outputs.MSI_VERSION }} `
             -o "..\SCBridgeCompanion-setup.msi" `
             -arch x64
 
@@ -108,5 +117,6 @@ jobs:
             LICENSE
           generate_release_notes: true
           draft: false
+          prerelease: ${{ steps.version.outputs.PRERELEASE == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
