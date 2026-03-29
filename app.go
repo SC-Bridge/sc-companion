@@ -9,12 +9,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
-	"strings"
 	"sync"
 	"time"
 
 	"fyne.io/systray"
 	wailsrt "github.com/wailsapp/wails/v2/pkg/runtime"
+	"golang.org/x/sys/windows/registry"
 
 	"github.com/SC-Bridge/sc-companion/internal/auth"
 	"github.com/SC-Bridge/sc-companion/internal/updater"
@@ -751,34 +751,34 @@ func (a *App) SetMinimizeToTray(enabled bool) {
 
 // GetStartWithWindows reports whether the app is registered to launch at Windows startup.
 func (a *App) GetStartWithWindows() bool {
-	out, err := exec.Command("reg", "query",
-		`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`,
-		"/v", "SC Bridge Companion",
-	).Output()
+	k, err := registry.OpenKey(registry.CURRENT_USER,
+		`Software\Microsoft\Windows\CurrentVersion\Run`,
+		registry.QUERY_VALUE,
+	)
 	if err != nil {
 		return false
 	}
-	return strings.Contains(string(out), "SC Bridge Companion")
+	defer k.Close()
+	_, _, err = k.GetStringValue("SC Bridge Companion")
+	return err == nil
 }
 
 // SetStartWithWindows adds or removes the Windows startup registry entry.
 func (a *App) SetStartWithWindows(enabled bool) error {
+	k, err := registry.OpenKey(registry.CURRENT_USER,
+		`Software\Microsoft\Windows\CurrentVersion\Run`,
+		registry.SET_VALUE,
+	)
+	if err != nil {
+		return err
+	}
+	defer k.Close()
 	if enabled {
 		exePath, err := os.Executable()
 		if err != nil {
 			return err
 		}
-		return exec.Command("reg", "add",
-			`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`,
-			"/v", "SC Bridge Companion",
-			"/t", "REG_SZ",
-			"/d", `"`+exePath+`"`,
-			"/f",
-		).Run()
+		return k.SetStringValue("SC Bridge Companion", `"`+exePath+`"`)
 	}
-	return exec.Command("reg", "delete",
-		`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`,
-		"/v", "SC Bridge Companion",
-		"/f",
-	).Run()
+	return k.DeleteValue("SC Bridge Companion")
 }
