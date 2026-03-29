@@ -96,7 +96,7 @@ type ConnectionStatus struct {
 }
 
 // Version is set at build time via -ldflags.
-var Version = "0.3.10"
+var Version = "0.3.12"
 
 const maxRecentEvents = 200
 

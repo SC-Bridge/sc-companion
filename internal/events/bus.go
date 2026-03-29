@@ -36,6 +36,9 @@ var SyncWorthyTypes = map[string]bool{
 	"money_sent":           true,
 	"fined":                true,
 	"transaction_complete": true,
+	"rewards_earned":       true,
+	"refinery_complete":    true,
+	"blueprint_received":   true,
 }
 
 // IsSyncWorthy returns true if this event type should be synced to the API.

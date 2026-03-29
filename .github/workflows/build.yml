@@ -7,8 +7,8 @@ on:
 
 permissions:
   contents: write
-  actions: read
-  id-token: write
+  # actions: read
+  # id-token: write
 
 jobs:
   build-windows:
@@ -61,52 +61,50 @@ jobs:
             -o "..\SCBridgeCompanion-setup.msi" `
             -arch x64
 
-      # Upload unsigned artifacts for SignPath (or direct release if signing not configured)
-      - name: Upload unsigned artifacts
-        id: upload-unsigned
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-binaries
-          path: |
-            SCBridgeCompanion-portable.exe
-            SCBridgeCompanion-setup.msi
-
-      # SignPath code signing (skipped until SIGNPATH_ORGANIZATION_ID is configured)
-      - name: Sign artifacts with SignPath
-        id: sign
-        if: vars.SIGNPATH_ORGANIZATION_ID != ''
-        uses: signpath/github-action-submit-signing-request@v2
-        with:
-          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
-          organization-id: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
-          project-slug: 'sc-companion'
-          signing-policy-slug: 'release-signing'
-          github-artifact-id: '${{ steps.upload-unsigned.outputs.artifact-id }}'
-          wait-for-completion: true
-          output-artifact-directory: 'signed'
-
-      # Use signed artifacts if available, otherwise use unsigned
-      - name: Prepare release artifacts
-        shell: pwsh
-        run: |
-          if (Test-Path "signed") {
-            Write-Host "Using signed artifacts"
-            Copy-Item "signed\*" "release\" -Force
-          } else {
-            Write-Host "Using unsigned artifacts (signing not configured)"
-            New-Item -ItemType Directory -Path "release" -Force | Out-Null
-            Copy-Item "SCBridgeCompanion-portable.exe" "release\"
-            Copy-Item "SCBridgeCompanion-setup.msi" "release\"
-          }
-          Copy-Item "LICENSE" "release\"
+      # SignPath code signing — commented out until OSS application is approved
+      # - name: Upload unsigned artifacts
+      #   id: upload-unsigned
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: unsigned-binaries
+      #     path: |
+      #       SCBridgeCompanion-portable.exe
+      #       SCBridgeCompanion-setup.msi
+      #
+      # - name: Sign artifacts with SignPath
+      #   id: sign
+      #   if: vars.SIGNPATH_ORGANIZATION_ID != ''
+      #   uses: signpath/github-action-submit-signing-request@v2
+      #   with:
+      #     api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+      #     organization-id: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
+      #     project-slug: 'sc-companion'
+      #     signing-policy-slug: 'release-signing'
+      #     github-artifact-id: '${{ steps.upload-unsigned.outputs.artifact-id }}'
+      #     wait-for-completion: true
+      #     output-artifact-directory: 'signed'
+      #
+      # - name: Prepare release artifacts
+      #   shell: pwsh
+      #   run: |
+      #     if (Test-Path "signed") {
+      #       Write-Host "Using signed artifacts"
+      #       Copy-Item "signed\*" "release\" -Force
+      #     } else {
+      #       Write-Host "Using unsigned artifacts (signing not configured)"
+      #       New-Item -ItemType Directory -Path "release" -Force | Out-Null
+      #       Copy-Item "SCBridgeCompanion-portable.exe" "release\"
+      #       Copy-Item "SCBridgeCompanion-setup.msi" "release\"
+      #     }
+      #     Copy-Item "LICENSE" "release\"
 
       - name: Upload release artifacts
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/SCBridgeCompanion-portable.exe
-            release/SCBridgeCompanion-setup.msi
-            release/LICENSE
+            SCBridgeCompanion-portable.exe
+            SCBridgeCompanion-setup.msi
+            LICENSE
           generate_release_notes: true
           draft: false
         env:
