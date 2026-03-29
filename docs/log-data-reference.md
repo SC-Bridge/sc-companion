@@ -5,18 +5,18 @@
 
 ---
 
-## Player Identity
+## Character Identity
 
-Logged once per session, near startup.
+Logged once per session, near startup. These fields identify your **in-game avatar**, not you as a person.
 
 | Field | Source | Example |
 |---|---|---|
-| Handle (in-game name) | `<Expect Incoming Connection>` | `YourHandle` |
-| Player GEID | `<Expect Incoming Connection>` | `201990621533` |
+| Character handle (in-game name) | `<Expect Incoming Connection>` | `YourHandle` |
+| Character GEID (RSI game account ID) | `<Expect Incoming Connection>` | `201990621533` |
 | Session UUID | `[Notice] AccountLogin` | `3c4fd6dd-bbe3-b943-bb56-8fcfe9f04965` |
 | Windows username | `[GameProfiles]` | `(not synced)` |
 
-The handle and GEID are the only identity fields synced to SC Bridge if connected. Session UUIDs are used locally for event correlation only.
+The character handle and GEID are the only identity fields synced to SC Bridge if connected. Session UUIDs are used locally for event correlation only. The Windows username is written to the log by Star Citizen but is never read or transmitted by this application.
 
 ---
 

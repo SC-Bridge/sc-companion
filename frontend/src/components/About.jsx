@@ -116,11 +116,11 @@ const EVENT_CATEGORIES = [
 const LOG_CONTENTS = [
   {
     id: 'identity',
-    label: 'Player Identity',
+    label: 'Character Identity',
     icon: Shield,
     items: [
-      { label: 'In-game handle', read: true, synced: true, note: 'e.g. YourHandle' },
-      { label: 'Player GEID', read: true, synced: true, note: 'Numeric account ID' },
+      { label: 'Character handle', read: true, synced: true, note: 'Your in-game avatar name' },
+      { label: 'Character GEID', read: true, synced: true, note: 'RSI game account ID, not personal data' },
       { label: 'Session UUID', read: true, synced: false, note: 'Local correlation only' },
       { label: 'Windows username', read: false, synced: false, note: 'Logged but not read' },
     ],
@@ -523,7 +523,7 @@ function About() {
       }}>
         <p style={{ fontSize: 11, color: '#4b5563', lineHeight: 1.6 }}>
           <span style={{ color: '#22d3ee' }}>Privacy: </span>
-          Hardware specs, network addresses, input device GUIDs, audio endpoints, overlay software, and your Windows username are written to <span className="font-[family-name:var(--font-mono)]" style={{ color: '#6b7280' }}>Game.log</span> by Star Citizen but are never read or transmitted by this application.
+          This app tracks your <strong style={{ color: '#9ca3af' }}>in-game character</strong> — handle and GEID — not you as a person. No real-world identity, hardware specs, network addresses, input device GUIDs, audio endpoints, overlay software, or Windows username are ever read or transmitted.
           Sync is opt-in — nothing leaves your machine unless you connect to SC Bridge in Settings.
         </p>
       </div>
