@@ -13,6 +13,9 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of SC Bridge Companion is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
+    <Icon Id="SCBridgeCompanion.ico" SourceFile="icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="SCBridgeCompanion.ico" />
+
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
     <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
 

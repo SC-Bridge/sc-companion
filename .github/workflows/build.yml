@@ -63,6 +63,7 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item "build\bin\SCBridgeCompanion.exe" "installer\SCBridgeCompanion.exe"
+          Copy-Item "build\windows\icon.ico" "installer\icon.ico"
           cd installer
           wix extension add WixToolset.UI.wixext/4.0.5
           wix build installer.wxs `
