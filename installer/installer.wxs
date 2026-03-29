@@ -5,7 +5,7 @@
   <Package
     Name="SC Bridge Companion"
     Manufacturer="SC Bridge"
-    Version="!(bind.FileVersion.MainExecutable)"
+    Version="$(ProductVersion)"
     UpgradeCode="f7a3c8d1-5e2b-4a9f-b6c4-8d1e3f5a7b2c"
     Language="1033"
     Scope="perMachine">

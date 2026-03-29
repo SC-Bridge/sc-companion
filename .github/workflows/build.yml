@@ -58,6 +58,7 @@ jobs:
           wix extension add WixToolset.UI.wixext/4.0.5
           wix build installer.wxs `
             -ext WixToolset.UI.wixext `
+            -d ProductVersion=${{ steps.version.outputs.VERSION }} `
             -o "..\SCBridgeCompanion-setup.msi" `
             -arch x64
 
