@@ -71,6 +71,8 @@ Three events require 2-line parsing (pendingType/pendingData):
 
 ## Completed
 
+- [x] Shipped v0.3.14-beta.2 pre-release (2026-03-29)
+- [x] Added pre-release CI support — tag suffix auto-detected, MSI version stripped of pre-release suffix for WiX (2026-03-29)
 - [x] Fixed wrong icon in Windows Installed Apps — added ARPPRODUCTICON to WiX installer (2026-03-29)
 - [x] Fixed console window flash on Settings open — replaced reg.exe exec with registry API (2026-03-29)
 - [x] Clarified character vs personal identity in About tab (2026-03-29)
