@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SC Bridge Companion — Game Log Monitor for Star Citizen</title>
+  <meta name="description" content="Automatically parse 57 Star Citizen game events and sync them to your SC Bridge profile. Real-time log monitoring, live dashboard, and friends list — free and open source." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #080c10;
+      --bg2:          #0d1117;
+      --surface:      #0f1923;
+      --surface2:     #152030;
+      --surface3:     #1a2a3d;
+      --border:       #1a2d40;
+      --border-lt:    #254560;
+      --text:         #cdd9e5;
+      --text-dim:     #7a9ab5;
+      --accent:       #4db8ff;
+      --accent-lt:    #82cfff;
+      --radius:       8px;
+      --radius-lg:    14px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-lt); text-decoration: underline; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 0 28px; }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(8,12,16,.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+    }
+    .nav-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 52px;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-logo:hover { text-decoration: none; color: var(--accent); }
+    .nav-logo span { color: var(--accent); }
+    .nav-links {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      list-style: none;
+    }
+    .nav-links a { font-size: 0.875rem; color: var(--text-dim); text-decoration: none; }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .nav-cta {
+      background: var(--accent);
+      color: #000 !important;
+      font-weight: 700;
+      font-size: 0.85rem !important;
+      padding: 7px 16px;
+      border-radius: var(--radius);
+      transition: background .15s;
+    }
+    .nav-cta:hover { background: var(--accent-lt) !important; text-decoration: none !important; }
+    @media (max-width: 600px) { .nav-links { display: none; } }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 96px 28px 72px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.20) 0%, transparent 100%),
+        radial-gradient(1px 1px at 88% 14%, rgba(255,255,255,.18) 0%, transparent 100%),
+        radial-gradient(1px 1px at 38% 72%, rgba(255,255,255,.18) 0%, transparent 100%),
+        radial-gradient(1px 1px at 72% 52%, rgba(255,255,255,.15) 0%, transparent 100%),
+        radial-gradient(1px 1px at 25% 44%, rgba(255,255,255,.18) 0%, transparent 100%),
+        radial-gradient(1px 1px at 91% 78%, rgba(255,255,255,.15) 0%, transparent 100%),
+        radial-gradient(1px 1px at 58% 86%, rgba(255,255,255,.13) 0%, transparent 100%),
+        radial-gradient(ellipse 70% 50% at 50% 0%, rgba(77,184,255,.07) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(77,184,255,.1);
+      border: 1px solid rgba(77,184,255,.25);
+      color: var(--accent-lt);
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 100px;
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1.15;
+      color: #fff;
+      margin-bottom: 20px;
+    }
+    .hero h1 .highlight {
+      background: linear-gradient(90deg, var(--accent), var(--accent-lt));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: 1.1rem;
+      color: var(--text-dim);
+      max-width: 600px;
+      margin: 0 auto 36px;
+    }
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: var(--accent);
+      color: #000;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 14px 30px;
+      border-radius: var(--radius);
+      transition: background .15s, box-shadow .15s;
+      text-decoration: none;
+      box-shadow: 0 0 28px rgba(77,184,255,.22);
+    }
+    .btn-primary:hover {
+      background: var(--accent-lt);
+      box-shadow: 0 0 36px rgba(77,184,255,.35);
+      text-decoration: none;
+      color: #000;
+    }
+    .btn-primary svg { width: 18px; height: 18px; fill: #000; flex-shrink: 0; }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: transparent;
+      border: 1px solid var(--border-lt);
+      color: var(--text);
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 13px 28px;
+      border-radius: var(--radius);
+      transition: border-color .15s, color .15s;
+      text-decoration: none;
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+    .btn-secondary svg { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
+    .hero-meta { margin-top: 16px; font-size: 0.82rem; color: var(--text-dim); }
+
+    /* ── STATS BAR ── */
+    .stats-bar {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 28px;
+    }
+    .stats-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 32px;
+      border-right: 1px solid var(--border);
+    }
+    .stat:last-child { border-right: none; }
+    .stat-val { font-size: 1.5rem; font-weight: 800; color: var(--accent); line-height: 1; }
+    .stat-lbl { font-size: 0.75rem; color: var(--text-dim); margin-top: 4px; text-transform: uppercase; letter-spacing: .05em; }
+    @media (max-width: 540px) {
+      .stat { padding: 8px 18px; border-right: none; border-bottom: 1px solid var(--border); width: 50%; }
+    }
+
+    /* ── SECTIONS ── */
+    section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+    .section-header { text-align: center; margin-bottom: 48px; }
+    .section-eyebrow {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      margin-bottom: 10px;
+    }
+    .section-header h2 {
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -.4px;
+    }
+    .section-header p { color: var(--text-dim); max-width: 520px; margin: 12px auto 0; font-size: 0.95rem; }
+
+    /* ── FEATURE GRID ── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      transition: border-color .2s, background .2s;
+    }
+    .feature-card:hover { border-color: var(--border-lt); background: var(--surface2); }
+    .feat-icon {
+      width: 42px; height: 42px;
+      border-radius: var(--radius);
+      background: var(--surface3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
+      margin-bottom: 14px;
+    }
+    .feature-card h3 { font-size: 0.95rem; font-weight: 600; color: #fff; margin-bottom: 6px; }
+    .feature-card p  { font-size: 0.855rem; color: var(--text-dim); line-height: 1.55; }
+
+    /* ── STEPS ── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px 22px;
+    }
+    .step-num {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-lt));
+      color: #000;
+      font-weight: 800;
+      font-size: 0.95rem;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 14px;
+      box-shadow: 0 0 16px rgba(77,184,255,.28);
+    }
+    .step-card h3 { font-size: 0.95rem; font-weight: 600; color: #fff; margin-bottom: 8px; }
+    .step-card p  { font-size: 0.855rem; color: var(--text-dim); line-height: 1.55; }
+
+    /* ── EVENT GRID ── */
+    .event-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .event-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+    }
+    .event-card-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .event-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .event-list li {
+      font-size: 0.845rem;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .event-list li::before {
+      content: "";
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+      opacity: .6;
+    }
+
+    /* ── NOTES ── */
+    .note-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .note-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid #d29922;
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      font-size: 0.875rem;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+    .note-card strong { color: var(--text); display: block; margin-bottom: 4px; }
+
+    /* ── FROM SOURCE ── */
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      font-family: "Consolas", "Cascadia Code", monospace;
+      font-size: 0.855rem;
+      overflow-x: auto;
+      color: #cdd9e5;
+      line-height: 1.7;
+    }
+
+    /* ── CTA BANNER ── */
+    .cta-banner {
+      background: linear-gradient(135deg, var(--surface2) 0%, var(--surface3) 100%);
+      border: 1px solid var(--border-lt);
+      border-radius: var(--radius-lg);
+      padding: 52px 40px;
+      text-align: center;
+      margin: 72px 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .cta-banner::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 80% at 50% 120%, rgba(77,184,255,.09) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cta-banner h2 { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 700; color: #fff; margin-bottom: 12px; }
+    .cta-banner p  { color: var(--text-dim); font-size: 0.975rem; max-width: 440px; margin: 0 auto 28px; }
+    .cta-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    /* ── FOOTER ── */
+    footer { border-top: 1px solid var(--border); padding: 32px 28px; text-align: center; }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .footer-links a { color: var(--text-dim); font-size: 0.875rem; text-decoration: none; }
+    .footer-links a:hover { color: var(--accent); text-decoration: none; }
+    .footer-legal { font-size: 0.78rem; color: var(--text-dim); opacity: .6; }
+
+    /* ── SUPPORT ── */
+    .support-section {
+      padding: 72px 28px;
+      text-align: center;
+    }
+    .support-section p {
+      color: var(--text-dim);
+      max-width: 480px;
+      margin: 12px auto 32px;
+      font-size: 1rem;
+    }
+    .btn-kofi {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #29ABE0;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 14px 30px;
+      border-radius: var(--radius);
+      transition: background .15s, box-shadow .15s;
+      text-decoration: none;
+      box-shadow: 0 0 24px rgba(41,171,224,.2);
+    }
+    .btn-kofi:hover {
+      background: #52c3ef;
+      box-shadow: 0 0 36px rgba(41,171,224,.35);
+      text-decoration: none;
+      color: #fff;
+    }
+    .btn-kofi svg { width: 22px; height: 22px; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">🛸 SC <span>Companion</span></a>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how-it-works">How It Works</a></li>
+        <li><a href="#events">Events</a></li>
+        <li><a href="#support">Support</a></li>
+        <li><a href="https://github.com/SC-Bridge/sc-companion" target="_blank">GitHub</a></li>
+        <li>
+          <a class="nav-cta" href="https://github.com/SC-Bridge/sc-companion/releases/latest/download/SCBridgeCompanion-portable.exe">
+            Download
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="container">
+      <div class="hero-eyebrow">✦ Star Citizen Companion &nbsp;·&nbsp; Free &amp; Open Source</div>
+      <h1>
+        Your Game Log,<br>
+        <span class="highlight">Alive and In Sync.</span>
+      </h1>
+      <p class="hero-sub">
+        SC Companion watches your Star Citizen <code>Game.log</code> in real time, parses 57 event types,
+        and syncs them to your SC Bridge profile — automatically, in the background,
+        without any manual steps.
+      </p>
+      <div class="hero-actions">
+        <a class="btn-primary" href="https://github.com/SC-Bridge/sc-companion/releases/latest/download/SCBridgeCompanion-portable.exe">
+          <svg viewBox="0 0 16 16"><path d="M7.47 10.78a.75.75 0 0 0 1.06 0l3.75-3.75a.75.75 0 0 0-1.06-1.06L8.75 8.44V1.75a.75.75 0 0 0-1.5 0v6.69L4.78 5.97a.75.75 0 0 0-1.06 1.06l3.75 3.75ZM3.75 13a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Z"/></svg>
+          Portable EXE
+        </a>
+        <a class="btn-secondary" href="https://github.com/SC-Bridge/sc-companion/releases/latest/download/SCBridgeCompanion-setup.msi">
+          <svg viewBox="0 0 16 16"><path d="M7.47 10.78a.75.75 0 0 0 1.06 0l3.75-3.75a.75.75 0 0 0-1.06-1.06L8.75 8.44V1.75a.75.75 0 0 0-1.5 0v6.69L4.78 5.97a.75.75 0 0 0-1.06 1.06l3.75 3.75ZM3.75 13a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Z"/></svg>
+          MSI Installer
+        </a>
+      </div>
+      <p class="hero-meta">Windows 10 / 11 &nbsp;·&nbsp; Portable EXE or MSI installer &nbsp;·&nbsp; No game files touched</p>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-bar">
+    <div class="stats-inner">
+      <div class="stat">
+        <span class="stat-val">57</span>
+        <span class="stat-lbl">Event Types</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">10s</span>
+        <span class="stat-lbl">Sync Interval</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">Auto</span>
+        <span class="stat-lbl">Log Detection</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">Win 10/11</span>
+        <span class="stat-lbl">Platform</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- FEATURES -->
+    <section id="features">
+      <div class="section-header">
+        <div class="section-eyebrow">What it does</div>
+        <h2>Your gameplay, tracked automatically</h2>
+        <p>Set it up once. From that point on, everything you do in Star Citizen appears in your SC Bridge profile without any manual steps.</p>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feat-icon">🔍</div>
+          <h3>Auto Log Detection</h3>
+          <p>No path browsing. Companion finds your <code>Game.log</code> via launcher, process, registry, or drive scan — whichever works first.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feat-icon">📋</div>
+          <h3>57 Event Patterns</h3>
+          <p>Logins, ships, contracts, money transfers, crimes, quantum travel, injuries, party events — and more, all parsed automatically.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feat-icon">🔄</div>
+          <h3>SC Bridge Sync</h3>
+          <p>OAuth 2.0 authentication. Events sync to your SC Bridge profile every 10 seconds, deduplicated and batched efficiently.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feat-icon">📊</div>
+          <h3>Live Dashboard</h3>
+          <p>Dark-themed React UI with a real-time event feed showing everything happening in your session as it happens.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feat-icon">👥</div>
+          <h3>Friends List</h3>
+          <p>See which of your Spectrum friends are online and active in the game right now.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feat-icon">📥</div>
+          <h3>System Tray</h3>
+          <p>Runs quietly in the background. Minimize to tray, restore on click. Out of the way when you don't need it.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feat-icon">🔔</div>
+          <h3>Self-Updating</h3>
+          <p>Checks for new releases every 4 hours. Update with one click — no re-downloading, no reinstalling.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feat-icon">🤖</div>
+          <h3>WingmanAI Integration</h3>
+          <p>Writes a <code>JSONL</code> event log alongside the app — ready for WingmanAI skill consumption.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section id="how-it-works">
+      <div class="section-header">
+        <div class="section-eyebrow">The process</div>
+        <h2>Running in five steps</h2>
+        <p>Download, connect once, then forget about it. Companion does the rest.</p>
+      </div>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <h3>Download</h3>
+          <p>Grab the portable EXE or MSI installer from GitHub Releases. Run it from anywhere — no installation required for the portable version.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <h3>Connect to SC Bridge</h3>
+          <p>Click <strong>Settings → Connect</strong> and authorize your SC Bridge account via OAuth in your browser. One-time setup.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <h3>Launch Star Citizen</h3>
+          <p>Start the game. Companion automatically finds your <code>Game.log</code> and begins tailing it immediately.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <h3>Play Normally</h3>
+          <p>Every 10 seconds, your in-game activity is parsed, deduplicated, and synced to your SC Bridge profile.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">5</div>
+          <h3>Check the Dashboard</h3>
+          <p>Open the Companion window any time to see your live event feed and which friends are currently online.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- EVENTS -->
+    <section id="events">
+      <div class="section-header">
+        <div class="section-eyebrow">Event coverage</div>
+        <h2>57 patterns across 6 categories</h2>
+        <p>Every significant in-game action is captured — from your first login to your last refinery pickup.</p>
+      </div>
+      <div class="event-grid">
+        <div class="event-card">
+          <div class="event-card-title">🔑 Session</div>
+          <ul class="event-list">
+            <li>Player login</li>
+            <li>Server joined</li>
+            <li>Session tracking</li>
+          </ul>
+        </div>
+        <div class="event-card">
+          <div class="event-card-title">🚀 Ships</div>
+          <ul class="event-list">
+            <li>Ship boarded / exited</li>
+            <li>Insurance claim</li>
+            <li>Ship destroyed</li>
+          </ul>
+        </div>
+        <div class="event-card">
+          <div class="event-card-title">📜 Contracts</div>
+          <ul class="event-list">
+            <li>Contract accepted</li>
+            <li>Contract completed</li>
+            <li>Contract failed</li>
+            <li>Mission ended</li>
+          </ul>
+        </div>
+        <div class="event-card">
+          <div class="event-card-title">💰 Economy</div>
+          <ul class="event-list">
+            <li>Money sent / received</li>
+            <li>Fined / penalised</li>
+            <li>Refinery complete</li>
+            <li>Blueprint received</li>
+            <li>Rewards earned</li>
+          </ul>
+        </div>
+        <div class="event-card">
+          <div class="event-card-title">📍 Location</div>
+          <ul class="event-list">
+            <li>Location change</li>
+            <li>Jurisdiction entered</li>
+            <li>Quantum travel</li>
+          </ul>
+        </div>
+        <div class="event-card">
+          <div class="event-card-title">⚠️ Combat &amp; Crime</div>
+          <ul class="event-list">
+            <li>Injury events</li>
+            <li>Crime notification</li>
+            <li>Party join / leave</li>
+            <li>30+ additional events</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- NOTES -->
+    <section id="notes">
+      <div class="section-header">
+        <div class="section-eyebrow">Good to know</div>
+        <h2>Notes &amp; expectations</h2>
+      </div>
+      <div class="note-grid">
+        <div class="note-card">
+          <strong>SmartScreen warning</strong>
+          SC Companion is not yet code-signed. Windows may show a SmartScreen warning on first launch.
+          Right-click the file → Properties → check <strong>Unblock</strong> → OK. This goes away once signing is in place.
+        </div>
+        <div class="note-card">
+          <strong>Read-only log access</strong>
+          Companion only reads <code>Game.log</code> — it never writes to or modifies any Star Citizen game files,
+          settings, or memory.
+        </div>
+        <div class="note-card">
+          <strong>Requires SC Bridge account</strong>
+          Events sync to <a href="https://scbridge.app" target="_blank">scbridge.app</a>. You'll need a free SC Bridge account to connect. Local JSONL logging works without an account.
+        </div>
+      </div>
+    </section>
+
+    <!-- FROM SOURCE -->
+    <section id="source">
+      <div class="section-header">
+        <div class="section-eyebrow">Developers</div>
+        <h2>Run from source</h2>
+      </div>
+      <pre><code>git clone https://github.com/SC-Bridge/sc-companion
+cd sc-companion
+go run main.go</code></pre>
+      <p style="margin-top: 14px; color: var(--text-dim); font-size: 0.875rem;">
+        Requires Go 1.22+ and Windows 10 / 11. For live-reload dev mode, run <code>wails dev</code> with
+        <a href="https://wails.io" target="_blank">Wails v2</a> installed. Build a distributable with <code>wails build</code>.
+      </p>
+    </section>
+
+    <!-- SUPPORT -->
+    <section id="support" class="support-section">
+      <div class="container">
+        <div class="section-eyebrow" style="display:inline-block; margin-bottom:16px;">Open Source &amp; Free Forever</div>
+        <h2 style="font-size:clamp(1.5rem,3vw,2.2rem); font-weight:800; color:#fff; margin-bottom:0;">Support the project</h2>
+        <p>SC Companion is free and will stay that way. If you enjoy using it and want to show your appreciation, supporting us on Ko-fi means a lot.</p>
+        <a class="btn-kofi" href="https://ko-fi.com/scbridge" target="_blank">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z"/></svg>
+          Support on Ko-fi
+        </a>
+      </div>
+    </section>
+
+    <!-- CTA BANNER -->
+    <div class="cta-banner">
+      <h2>Ready to track your 'verse?</h2>
+      <p>Free download. No configuration. Just run it and play.</p>
+      <div class="cta-actions">
+        <a class="btn-primary" href="https://github.com/SC-Bridge/sc-companion/releases/latest/download/SCBridgeCompanion-portable.exe">
+          <svg viewBox="0 0 16 16"><path d="M7.47 10.78a.75.75 0 0 0 1.06 0l3.75-3.75a.75.75 0 0 0-1.06-1.06L8.75 8.44V1.75a.75.75 0 0 0-1.5 0v6.69L4.78 5.97a.75.75 0 0 0-1.06 1.06l3.75 3.75ZM3.75 13a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Z"/></svg>
+          Portable EXE
+        </a>
+        <a class="btn-secondary" href="https://github.com/SC-Bridge/sc-companion/releases/latest/download/SCBridgeCompanion-setup.msi">
+          <svg viewBox="0 0 16 16"><path d="M7.47 10.78a.75.75 0 0 0 1.06 0l3.75-3.75a.75.75 0 0 0-1.06-1.06L8.75 8.44V1.75a.75.75 0 0 0-1.5 0v6.69L4.78 5.97a.75.75 0 0 0-1.06 1.06l3.75 3.75ZM3.75 13a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Z"/></svg>
+          MSI Installer
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="https://ko-fi.com/scbridge" target="_blank">Ko-fi</a>
+        <a href="https://scbridge.app" target="_blank">SC Bridge</a>
+        <a href="https://github.com/SC-Bridge/sc-companion" target="_blank">GitHub</a>
+        <a href="https://github.com/SC-Bridge/sc-companion/releases" target="_blank">Releases</a>
+        <a href="https://github.com/SC-Bridge/sc-companion/issues" target="_blank">Report a Bug</a>
+      </div>
+      <p class="footer-legal">
+        Made by <a href="https://ko-fi.com/scbridge" target="_blank" style="color:var(--text-dim)">SC Bridge</a>
+        &nbsp;·&nbsp;
+        Not affiliated with Cloud Imperium Games or Roberts Space Industries.
+      </p>
+    </div>
+  </footer>
+
+</body>
+</html>
