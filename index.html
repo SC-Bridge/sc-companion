@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SC Bridge Companion — Game Log Monitor for Star Citizen</title>
+  <meta name="description" content="Automatically parse 57 Star Citizen game events and sync them to your SC Bridge profile. Real-time log monitoring, live dashboard, and friends list — free and open source." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #080c10;
+      --bg2:          #0d1117;
+      --surface:      #0f1923;
+      --surface2:     #152030;
+      --surface3:     #1a2a3d;
+      --border:       #1a2d40;
+      --border-lt:    #254560;
+      --text:         #cdd9e5;
+      --text-dim:     #7a9ab5;
+      --accent:       #4db8ff;
+      --accent-lt:    #82cfff;
+      --accent-dim:   rgba(77,184,255,.08);
+      --radius:       8px;
+      --radius-lg:    14px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-lt); text-decoration: underline; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 0 28px; }
+
+    /* ── SKIP LINK ── */
+    .skip-link {
+      position: absolute;
+      top: -100%;
+      left: 16px;
+      z-index: 9999;
+      background: var(--accent);
+      color: #000;
+      font-weight: 700;
+      font-size: 0.875rem;
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: top .15s;
+    }
+    .skip-link:focus { top: 8px; }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(8,12,16,.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+    }
+    .nav-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 52px;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--text);
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .nav-logo:hover { text-decoration: none; color: var(--accent); }
+    .nav-logo:hover svg { stroke: var(--accent); }
+    .nav-logo svg { width: 20px; height: 20px; stroke: var(--text-dim); transition: stroke .15s; flex-shrink: 0; }
+    .nav-logo span { color: var(--accent); }
+    .nav-links {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      list-style: none;
+    }
+    .nav-links a { font-size: 0.875rem; color: var(--text-dim); text-decoration: none; transition: color .15s; }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .nav-cta {
+      background: var(--accent);
+      color: #000 !important;
+      font-weight: 700;
+      font-size: 0.85rem !important;
+      padding: 7px 16px;
+      border-radius: var(--radius);
+      transition: background .15s;
+    }
+    .nav-cta:hover { background: var(--accent-lt) !important; text-decoration: none !important; color: #000 !important; }
+
+    /* ── HAMBURGER ── */
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      gap: 5px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      margin: -8px;
+      min-width: 40px;
+      min-height: 40px;
+    }
+    .hamburger span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px;
+      transition: transform .2s ease, opacity .2s ease;
+    }
+    .hamburger[aria-expanded="true"] span:nth-child(1) {
+      transform: translateY(7px) rotate(45deg);
+    }
+    .hamburger[aria-expanded="true"] span:nth-child(2) {
+      opacity: 0;
+      transform: scaleX(0);
+    }
+    .hamburger[aria-expanded="true"] span:nth-child(3) {
+      transform: translateY(-7px) rotate(-45deg);
+    }
+
+    @media (max-width: 640px) {
+      .hamburger { display: flex; }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 52px;
+        left: 0; right: 0;
+        background: rgba(8,12,16,.98);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border);
+        padding: 16px 28px 20px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .nav-links.nav-open { display: flex; }
+      .nav-links a { font-size: 1rem; }
+      .nav-cta { font-size: 0.95rem !important; padding: 10px 20px; }
+    }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 80px 28px 64px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.22) 0%, transparent 100%),
+        radial-gradient(1px 1px at 88% 14%, rgba(255,255,255,.18) 0%, transparent 100%),
+        radial-gradient(1px 1px at 38% 72%, rgba(255,255,255,.18) 0%, transparent 100%),
+        radial-gradient(1px 1px at 72% 52%, rgba(255,255,255,.15) 0%, transparent 100%),
+        radial-gradient(1px 1px at 25% 44%, rgba(255,255,255,.18) 0%, transparent 100%),
+        radial-gradient(1px 1px at 91% 78%, rgba(255,255,255,.16) 0%, transparent 100%),
+        radial-gradient(1px 1px at 58% 86%, rgba(255,255,255,.13) 0%, transparent 100%),
+        radial-gradient(1px 1px at 5%  90%, rgba(255,255,255,.12) 0%, transparent 100%),
+        radial-gradient(1px 1px at 65% 8%,  rgba(255,255,255,.15) 0%, transparent 100%),
+        radial-gradient(1px 1px at 44% 30%, rgba(255,255,255,.12) 0%, transparent 100%),
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(77,184,255,.09) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .hero-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 52px;
+      align-items: center;
+    }
+    .hero-text { position: relative; z-index: 1; }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(77,184,255,.1);
+      border: 1px solid rgba(77,184,255,.25);
+      color: var(--accent-lt);
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 100px;
+      margin-bottom: 24px;
+    }
+    .eyebrow-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .4; }
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 4.5vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1.15;
+      color: #fff;
+      margin-bottom: 20px;
+    }
+    .hero h1 .highlight {
+      background: linear-gradient(90deg, var(--accent), var(--accent-lt));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: 1.05rem;
+      color: var(--text-dim);
+      margin-bottom: 36px;
+      line-height: 1.7;
+      max-width: 480px;
+    }
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: var(--accent);
+      color: #000;
+      font-weight: 700;
+      font-size: 0.975rem;
+      padding: 13px 26px;
+      border-radius: var(--radius);
+      transition: background .15s, box-shadow .15s;
+      text-decoration: none;
+      box-shadow: 0 0 28px rgba(77,184,255,.22);
+      min-height: 46px;
+    }
+    .btn-primary:hover {
+      background: var(--accent-lt);
+      box-shadow: 0 0 40px rgba(77,184,255,.38);
+      text-decoration: none;
+      color: #000;
+    }
+    .btn-primary svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: transparent;
+      border: 1px solid var(--border-lt);
+      color: var(--text);
+      font-weight: 600;
+      font-size: 0.975rem;
+      padding: 12px 24px;
+      border-radius: var(--radius);
+      transition: border-color .15s, color .15s;
+      text-decoration: none;
+      min-height: 46px;
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+    .btn-secondary svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .hero-meta { margin-top: 16px; font-size: 0.81rem; color: var(--text-dim); opacity: .7; }
+
+    /* ── HERO MOCKUP ── */
+    .hero-visual { position: relative; z-index: 1; }
+    .mockup-card {
+      background: var(--surface2);
+      border: 1px solid var(--border-lt);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(77,184,255,.06),
+        0 24px 64px rgba(0,0,0,.5),
+        0 0 80px rgba(77,184,255,.06);
+    }
+    .mockup-titlebar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px;
+      background: var(--surface3);
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-dots { display: flex; gap: 6px; }
+    .mockup-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+    .mockup-dot.red    { background: #ff5f57; }
+    .mockup-dot.yellow { background: #febc2e; }
+    .mockup-dot.green  { background: #28c840; }
+    .mockup-appname {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: .03em;
+      flex: 1;
+      text-align: center;
+    }
+    .mockup-sync {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #28c840;
+      letter-spacing: .05em;
+    }
+    .mockup-sync-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #28c840;
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+    .mockup-events {
+      padding: 10px 0;
+    }
+    .mockup-event {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      transition: background .15s;
+    }
+    .mockup-event:last-child { border-bottom: none; }
+    .mockup-event.new-event {
+      background: rgba(77,184,255,.05);
+      animation: event-in .4s ease-out;
+    }
+    @keyframes event-in {
+      from { opacity: 0; transform: translateX(-6px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .evt-tag {
+      font-size: 0.64rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      padding: 2px 7px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      font-family: "Consolas", "Cascadia Code", monospace;
+    }
+    .tag-login    { background: rgba(77,184,255,.15); color: var(--accent-lt); }
+    .tag-ship     { background: rgba(140,100,255,.15); color: #b899ff; }
+    .tag-qt       { background: rgba(255,200,60,.12);  color: #ffd466; }
+    .tag-mission  { background: rgba(60,220,120,.12);  color: #5ce09a; }
+    .tag-uec      { background: rgba(255,150,60,.12);  color: #ffa566; }
+    .evt-text {
+      font-size: 0.78rem;
+      color: var(--text);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .evt-time {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      flex-shrink: 0;
+      font-family: "Consolas", "Cascadia Code", monospace;
+    }
+    .mockup-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 14px;
+      background: var(--surface3);
+      border-top: 1px solid var(--border);
+      font-size: 0.71rem;
+      color: var(--text-dim);
+    }
+    .mockup-footer-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: .6;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 768px) {
+      .hero { padding: 60px 28px 48px; }
+      .hero-inner {
+        grid-template-columns: 1fr;
+        gap: 36px;
+        text-align: center;
+      }
+      .hero-sub { margin: 0 auto 36px; }
+      .hero-actions { justify-content: center; }
+      .hero-meta { text-align: center; }
+    }
+
+    /* ── STATS BAR ── */
+    .stats-bar {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+    }
+    .stats-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      border-right: 1px solid var(--border);
+      position: relative;
+    }
+    .stat::after {
+      content: "";
+      position: absolute;
+      bottom: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 32px; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0;
+      transition: opacity .2s;
+    }
+    .stat:hover::after { opacity: 1; }
+    .stat:last-child { border-right: none; }
+    .stat-val {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1;
+      letter-spacing: -1px;
+    }
+    .stat-lbl {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      margin-top: 6px;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+    }
+    @media (max-width: 540px) {
+      .stats-inner { grid-template-columns: repeat(2, 1fr); }
+      .stat { border-right: none; border-bottom: 1px solid var(--border); }
+      .stat:nth-child(even) { border-left: 1px solid var(--border); }
+      .stat:nth-last-child(-n+2) { border-bottom: none; }
+    }
+
+    /* ── SECTIONS ── */
+    section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+    .section-header { text-align: center; margin-bottom: 48px; }
+    .section-eyebrow {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      margin-bottom: 10px;
+    }
+    .section-header h2 {
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -.4px;
+    }
+    .section-header p {
+      color: var(--text-dim);
+      max-width: 520px;
+      margin: 12px auto 0;
+      font-size: 0.95rem;
+    }
+
+    /* ── FEATURE GRID ── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 14px;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      transition: border-color .2s, background .2s, transform .2s;
+      cursor: default;
+    }
+    .feature-card:hover {
+      border-color: var(--border-lt);
+      background: var(--surface2);
+      transform: translateY(-2px);
+    }
+    .feat-icon {
+      width: 44px; height: 44px;
+      border-radius: var(--radius);
+      background: var(--accent-dim);
+      border: 1px solid rgba(77,184,255,.15);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px;
+      flex-shrink: 0;
+    }
+    .feat-icon svg {
+      width: 22px; height: 22px;
+      stroke: var(--accent);
+      fill: none;
+    }
+    .feature-card h3 { font-size: 0.95rem; font-weight: 600; color: #fff; margin-bottom: 7px; }
+    .feature-card p  { font-size: 0.855rem; color: var(--text-dim); line-height: 1.6; }
+
+    /* ── STEPS ── */
+    .steps-wrap { position: relative; }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      position: relative;
+    }
+    .steps::before {
+      content: "";
+      position: absolute;
+      top: 30px;
+      left: calc(10% + 16px);
+      right: calc(10% + 16px);
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-lt) 15%, var(--border-lt) 85%, transparent);
+      z-index: 0;
+    }
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 22px 18px;
+      position: relative;
+      z-index: 1;
+      transition: border-color .2s;
+    }
+    .step-card:hover { border-color: var(--border-lt); }
+    .step-num {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--surface3), var(--surface2));
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 0.9rem;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 14px;
+    }
+    .step-card h3 { font-size: 0.9rem; font-weight: 600; color: #fff; margin-bottom: 8px; }
+    .step-card p  { font-size: 0.82rem; color: var(--text-dim); line-height: 1.6; }
+
+    @media (max-width: 768px) {
+      .steps {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .steps::before { display: none; }
+    }
+    @media (max-width: 400px) {
+      .steps { grid-template-columns: 1fr; }
+    }
+
+    /* ── EVENT GRID ── */
+    .event-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 14px;
+    }
+    .event-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+      transition: border-color .2s;
+    }
+    .event-card:hover { border-color: var(--border-lt); }
+    .event-card-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .event-card-title svg {
+      width: 18px; height: 18px;
+      stroke: var(--accent);
+      fill: none;
+      flex-shrink: 0;
+    }
+    .event-list { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+    .event-list li {
+      font-size: 0.84rem;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .event-list li::before {
+      content: "";
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+      opacity: .5;
+    }
+
+    /* ── NOTES ── */
+    .note-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .note-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid #c9943a;
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      font-size: 0.875rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+    .note-card strong { color: var(--text); display: block; margin-bottom: 5px; }
+
+    /* ── SOURCE ── */
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+      font-family: "Consolas", "Cascadia Code", monospace;
+      font-size: 0.855rem;
+      overflow-x: auto;
+      color: #cdd9e5;
+      line-height: 1.7;
+    }
+
+    /* ── CTA BANNER ── */
+    .cta-banner {
+      background: linear-gradient(135deg, var(--surface2) 0%, var(--surface3) 100%);
+      border: 1px solid var(--border-lt);
+      border-radius: var(--radius-lg);
+      padding: 56px 40px;
+      text-align: center;
+      margin: 72px 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .cta-banner::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 80% at 50% 120%, rgba(77,184,255,.1) 0%, transparent 70%),
+        radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,.15) 0%, transparent 100%),
+        radial-gradient(1px 1px at 80% 20%, rgba(255,255,255,.12) 0%, transparent 100%),
+        radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,.10) 0%, transparent 100%);
+      pointer-events: none;
+    }
+    .cta-banner h2 {
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    .cta-banner p {
+      color: var(--text-dim);
+      font-size: 0.975rem;
+      max-width: 420px;
+      margin: 0 auto 32px;
+      position: relative;
+    }
+    .cta-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      position: relative;
+    }
+
+    /* ── SUPPORT ── */
+    .support-section {
+      padding: 72px 28px;
+      text-align: center;
+      border-bottom: none;
+    }
+    .support-section .section-header { margin-bottom: 28px; }
+    .support-section p {
+      color: var(--text-dim);
+      max-width: 460px;
+      margin: 12px auto 32px;
+      font-size: 1rem;
+    }
+    .btn-kofi {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #29ABE0;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 14px 30px;
+      border-radius: var(--radius);
+      transition: background .15s, box-shadow .15s;
+      text-decoration: none;
+      box-shadow: 0 0 24px rgba(41,171,224,.18);
+      min-height: 50px;
+    }
+    .btn-kofi:hover {
+      background: #52c3ef;
+      box-shadow: 0 0 40px rgba(41,171,224,.32);
+      text-decoration: none;
+      color: #fff;
+    }
+    .btn-kofi svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 28px;
+      text-align: center;
+    }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .footer-links a {
+      color: var(--text-dim);
+      font-size: 0.875rem;
+      text-decoration: none;
+      transition: color .15s;
+    }
+    .footer-links a:hover { color: var(--accent); text-decoration: none; }
+    .footer-legal { font-size: 0.78rem; color: var(--text-dim); opacity: .55; }
+
+    /* ── FOCUS STATES ── */
+    a:focus-visible,
+    button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <!-- NAV -->
+  <nav aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo" aria-label="SC Companion home">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/>
+        </svg>
+        SC <span>Companion</span>
+      </a>
+      <ul class="nav-links" id="nav-menu" role="list">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how-it-works">How It Works</a></li>
+        <li><a href="#events">Events</a></li>
+        <li><a href="#support">Support</a></li>
+        <li>
+          <a href="https://github.com/SC-Bridge/sc-companion" target="_blank" rel="noopener">GitHub</a>
+        </li>
+        <li>
+          <a class="nav-cta" href="https://github.com/SC-Bridge/sc-companion/releases/latest/download/SCBridgeCompanion-portable.exe">
+            Download
+          </a>
+        </li>
+      </ul>
+      <button class="hamburger" id="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="nav-menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <main id="main">
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-inner">
+
+        <!-- Text -->
+        <div class="hero-text">
+          <div class="hero-eyebrow">
+            <span class="eyebrow-dot" aria-hidden="true"></span>
+            Star Citizen Companion &nbsp;·&nbsp; Free &amp; Open Source
+          </div>
+          <h1>
+            Your Game Log,<br>
+            <span class="highlight">Alive and In Sync.</span>
+          </h1>
+          <p class="hero-sub">
+            SC Companion watches your Star Citizen <code>Game.log</code> in real time,
+            parses 57 event types, and syncs them to your SC Bridge profile —
+            automatically, in the background.
+          </p>
+          <div class="hero-actions">
+            <a class="btn-primary" href="https://github.com/SC-Bridge/sc-companion/releases/latest/download/SCBridgeCompanion-portable.exe">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+              Portable EXE
+            </a>
+            <a class="btn-secondary" href="https://github.com/SC-Bridge/sc-companion/releases/latest/download/SCBridgeCompanion-setup.msi">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+              MSI Installer
+            </a>
+          </div>
+          <p class="hero-meta">Windows 10 / 11 &nbsp;·&nbsp; No game files touched &nbsp;·&nbsp; MIT License</p>
+        </div>
+
+        <!-- Mockup -->
+        <div class="hero-visual" aria-hidden="true">
+          <div class="mockup-card">
+            <div class="mockup-titlebar">
+              <div class="mockup-dots">
+                <div class="mockup-dot red"></div>
+                <div class="mockup-dot yellow"></div>
+                <div class="mockup-dot green"></div>
+              </div>
+              <span class="mockup-appname">SC Companion — Live Events</span>
+              <div class="mockup-sync">
+                <div class="mockup-sync-dot"></div>
+                LIVE
+              </div>
+            </div>
+            <div class="mockup-events">
+              <div class="mockup-event">
+                <span class="evt-tag tag-login">LOGIN</span>
+                <span class="evt-text">Player joined — Eagle Squadron</span>
+                <span class="evt-time">0:02</span>
+              </div>
+              <div class="mockup-event">
+                <span class="evt-tag tag-ship">SHIP</span>
+                <span class="evt-text">Boarded Cutlass Black (CSE-7)</span>
+                <span class="evt-time">1:14</span>
+              </div>
+              <div class="mockup-event">
+                <span class="evt-tag tag-qt">QT</span>
+                <span class="evt-text">Quantum travel → ArcCorp</span>
+                <span class="evt-time">2:33</span>
+              </div>
+              <div class="mockup-event">
+                <span class="evt-tag tag-mission">MISSION</span>
+                <span class="evt-text">Contract accepted — Delivery run</span>
+                <span class="evt-time">4:01</span>
+              </div>
+              <div class="mockup-event new-event">
+                <span class="evt-tag tag-uec">UEC</span>
+                <span class="evt-text">Payment received — 28,500 aUEC</span>
+                <span class="evt-time">now</span>
+              </div>
+            </div>
+            <div class="mockup-footer">
+              <div class="mockup-footer-dot"></div>
+              <span>14 events synced today &nbsp;·&nbsp; Last sync 3s ago</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-bar" aria-label="Key statistics">
+      <div class="stats-inner">
+        <div class="stat">
+          <span class="stat-val">57</span>
+          <span class="stat-lbl">Event Types</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val">10s</span>
+          <span class="stat-lbl">Sync Interval</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val">Auto</span>
+          <span class="stat-lbl">Log Detection</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val">Free</span>
+          <span class="stat-lbl">Always &amp; Forever</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+
+      <!-- FEATURES -->
+      <section id="features">
+        <div class="section-header">
+          <div class="section-eyebrow">What it does</div>
+          <h2>Your gameplay, tracked automatically</h2>
+          <p>Set it up once. From that point on, everything you do in Star Citizen appears in your SC Bridge profile without any manual steps.</p>
+        </div>
+        <div class="feature-grid">
+
+          <div class="feature-card">
+            <div class="feat-icon">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+            </div>
+            <h3>Auto Log Detection</h3>
+            <p>No path browsing. Companion finds your <code>Game.log</code> via launcher, process, registry, or drive scan — whichever works first.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feat-icon">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.25 6.75h7.5M8.25 12h7.5m-7.5 5.25h7.5M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>
+            </div>
+            <h3>57 Event Patterns</h3>
+            <p>Logins, ships, contracts, money transfers, crimes, quantum travel, injuries, party events — and more, all parsed automatically.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feat-icon">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+            </div>
+            <h3>SC Bridge Sync</h3>
+            <p>OAuth 2.0 authentication. Events sync to your SC Bridge profile every 10 seconds, deduplicated and batched efficiently.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feat-icon">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0H3"/></svg>
+            </div>
+            <h3>Live Dashboard</h3>
+            <p>Dark-themed React UI with a real-time event feed showing everything happening in your session as it happens.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feat-icon">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+            </div>
+            <h3>Friends List</h3>
+            <p>See which of your Spectrum friends are online and active in the game right now.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feat-icon">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z"/></svg>
+            </div>
+            <h3>System Tray</h3>
+            <p>Runs quietly in the background. Minimize to tray, restore on click. Out of the way when you don't need it.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feat-icon">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18"/></svg>
+            </div>
+            <h3>Self-Updating</h3>
+            <p>Checks for new releases every 4 hours. Update with one click — no re-downloading, no reinstalling.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feat-icon">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 0 0 2.25-2.25V6.75a2.25 2.25 0 0 0-2.25-2.25H6.75A2.25 2.25 0 0 0 4.5 6.75v10.5a2.25 2.25 0 0 0 2.25 2.25Zm.75-12h9v9h-9v-9Z"/></svg>
+            </div>
+            <h3>WingmanAI Integration</h3>
+            <p>Writes a <code>JSONL</code> event log alongside the app — ready for WingmanAI skill consumption.</p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- HOW IT WORKS -->
+      <section id="how-it-works">
+        <div class="section-header">
+          <div class="section-eyebrow">The process</div>
+          <h2>Running in five steps</h2>
+          <p>Download, connect once, then forget about it. Companion does the rest.</p>
+        </div>
+        <div class="steps">
+          <div class="step-card">
+            <div class="step-num" aria-hidden="true">1</div>
+            <h3>Download</h3>
+            <p>Grab the portable EXE or MSI installer from GitHub Releases. Run it from anywhere.</p>
+          </div>
+          <div class="step-card">
+            <div class="step-num" aria-hidden="true">2</div>
+            <h3>Connect to SC Bridge</h3>
+            <p>Click <strong>Settings → Connect</strong> and authorize your SC Bridge account via OAuth. One-time setup.</p>
+          </div>
+          <div class="step-card">
+            <div class="step-num" aria-hidden="true">3</div>
+            <h3>Launch Star Citizen</h3>
+            <p>Start the game. Companion automatically finds your <code>Game.log</code> and begins tailing it.</p>
+          </div>
+          <div class="step-card">
+            <div class="step-num" aria-hidden="true">4</div>
+            <h3>Play Normally</h3>
+            <p>Every 10 seconds, your in-game activity is parsed, deduplicated, and synced automatically.</p>
+          </div>
+          <div class="step-card">
+            <div class="step-num" aria-hidden="true">5</div>
+            <h3>Check the Dashboard</h3>
+            <p>Open the Companion window any time to see your live event feed and online friends.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- EVENTS -->
+      <section id="events">
+        <div class="section-header">
+          <div class="section-eyebrow">Event coverage</div>
+          <h2>57 patterns across 6 categories</h2>
+          <p>Every significant in-game action is captured — from your first login to your last refinery pickup.</p>
+        </div>
+        <div class="event-grid">
+
+          <div class="event-card">
+            <div class="event-card-title">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 0 1 21.75 8.25Z"/></svg>
+              Session
+            </div>
+            <ul class="event-list">
+              <li>Player login</li>
+              <li>Server joined</li>
+              <li>Session tracking</li>
+            </ul>
+          </div>
+
+          <div class="event-card">
+            <div class="event-card-title">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/></svg>
+              Ships
+            </div>
+            <ul class="event-list">
+              <li>Ship boarded / exited</li>
+              <li>Insurance claim</li>
+              <li>Ship destroyed</li>
+            </ul>
+          </div>
+
+          <div class="event-card">
+            <div class="event-card-title">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>
+              Contracts
+            </div>
+            <ul class="event-list">
+              <li>Contract accepted</li>
+              <li>Contract completed</li>
+              <li>Contract failed</li>
+              <li>Mission ended</li>
+            </ul>
+          </div>
+
+          <div class="event-card">
+            <div class="event-card-title">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+              Economy
+            </div>
+            <ul class="event-list">
+              <li>Money sent / received</li>
+              <li>Fined / penalised</li>
+              <li>Refinery complete</li>
+              <li>Blueprint received</li>
+              <li>Rewards earned</li>
+            </ul>
+          </div>
+
+          <div class="event-card">
+            <div class="event-card-title">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+              Location
+            </div>
+            <ul class="event-list">
+              <li>Location change</li>
+              <li>Jurisdiction entered</li>
+              <li>Quantum travel</li>
+            </ul>
+          </div>
+
+          <div class="event-card">
+            <div class="event-card-title">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v3.75m0-10.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.25-8.25-3.286Zm0 13.036h.008v.008H12v-.008Z"/></svg>
+              Combat &amp; Crime
+            </div>
+            <ul class="event-list">
+              <li>Injury events</li>
+              <li>Crime notification</li>
+              <li>Party join / leave</li>
+              <li>30+ additional events</li>
+            </ul>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- NOTES -->
+      <section id="notes">
+        <div class="section-header">
+          <div class="section-eyebrow">Good to know</div>
+          <h2>Notes &amp; expectations</h2>
+        </div>
+        <div class="note-grid">
+          <div class="note-card">
+            <strong>SmartScreen warning</strong>
+            SC Companion is not yet code-signed. Windows may show a SmartScreen warning on first launch.
+            Right-click the file → Properties → check <strong>Unblock</strong> → OK. This goes away once signing is in place.
+          </div>
+          <div class="note-card">
+            <strong>Read-only log access</strong>
+            Companion only reads <code>Game.log</code> — it never writes to or modifies any Star Citizen game files,
+            settings, or memory.
+          </div>
+          <div class="note-card">
+            <strong>Requires SC Bridge account</strong>
+            Events sync to <a href="https://scbridge.app" target="_blank" rel="noopener">scbridge.app</a>. You'll need a free SC Bridge account to connect. Local JSONL logging works without an account.
+          </div>
+        </div>
+      </section>
+
+      <!-- FROM SOURCE -->
+      <section id="source">
+        <div class="section-header">
+          <div class="section-eyebrow">Developers</div>
+          <h2>Run from source</h2>
+        </div>
+        <pre><code>git clone https://github.com/SC-Bridge/sc-companion
+cd sc-companion
+go run main.go</code></pre>
+        <p style="margin-top: 14px; color: var(--text-dim); font-size: 0.875rem;">
+          Requires Go 1.22+ and Windows 10 / 11. For live-reload dev mode, run <code>wails dev</code> with
+          <a href="https://wails.io" target="_blank" rel="noopener">Wails v2</a> installed. Build a distributable with <code>wails build</code>.
+        </p>
+      </section>
+
+      <!-- SUPPORT -->
+      <section id="support" class="support-section">
+        <div class="section-header">
+          <div class="section-eyebrow">Open Source &amp; Free Forever</div>
+          <h2>Support the project</h2>
+        </div>
+        <p>SC Companion is free and will stay that way. If you enjoy using it and want to show your appreciation, supporting us on Ko-fi means a lot.</p>
+        <a class="btn-kofi" href="https://ko-fi.com/scbridge" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z"/></svg>
+          Support on Ko-fi
+        </a>
+      </section>
+
+      <!-- CTA BANNER -->
+      <div class="cta-banner">
+        <h2>Ready to track your 'verse?</h2>
+        <p>Free download. No configuration. Just run it and play.</p>
+        <div class="cta-actions">
+          <a class="btn-primary" href="https://github.com/SC-Bridge/sc-companion/releases/latest/download/SCBridgeCompanion-portable.exe">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+            Portable EXE
+          </a>
+          <a class="btn-secondary" href="https://github.com/SC-Bridge/sc-companion/releases/latest/download/SCBridgeCompanion-setup.msi">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+            MSI Installer
+          </a>
+        </div>
+      </div>
+
+    </div><!-- /container -->
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="https://ko-fi.com/scbridge" target="_blank" rel="noopener">Ko-fi</a>
+        <a href="https://scbridge.app" target="_blank" rel="noopener">SC Bridge</a>
+        <a href="https://github.com/SC-Bridge/sc-companion" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/SC-Bridge/sc-companion/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/SC-Bridge/sc-companion/issues" target="_blank" rel="noopener">Report a Bug</a>
+      </div>
+      <p class="footer-legal">
+        Made by <a href="https://ko-fi.com/scbridge" target="_blank" rel="noopener" style="color:var(--text-dim)">SC Bridge</a>
+        &nbsp;·&nbsp;
+        Not affiliated with Cloud Imperium Games or Roberts Space Industries.
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    // Mobile hamburger toggle
+    const toggle = document.getElementById('nav-toggle');
+    const menu   = document.getElementById('nav-menu');
+    toggle.addEventListener('click', () => {
+      const open = menu.classList.toggle('nav-open');
+      toggle.setAttribute('aria-expanded', String(open));
+    });
+    // Close menu when a link is clicked
+    menu.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        menu.classList.remove('nav-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      });
+    });
+  </script>
+
+</body>
+</html>
