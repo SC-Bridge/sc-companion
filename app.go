@@ -149,9 +149,12 @@ func (a *App) startup(ctx context.Context) {
 	// Event bus
 	a.bus = events.NewBus()
 
-	// Dedup + coalesce
+	// Dedup
 	dedup := events.NewDeduplicator(10 * time.Second)
-	coalesce := events.NewCoalesceMultiLine()
+	// Game.log re-fires "Low Fuel" every ~2 minutes while fuel stays low;
+	// the default 10s cooldown doesn't throttle that, so give it its own
+	// window (sc_log_reader TODO.md: notify_fuel_low needs separate cooldown).
+	dedup.SetTypeCooldown("low_fuel", 5*time.Minute)
 
 	// Create a cancellable context for services
 	svcCtx, svcCancel := context.WithCancel(context.Background())
@@ -163,32 +166,24 @@ func (a *App) startup(ctx context.Context) {
 
 	// Event subscriber — persist + buffer + always emit to frontend
 	a.bus.Subscribe(func(evt events.Event) {
-		// Coalesce multi-line money events
-		merged, emit := coalesce.Process(evt)
-		if !emit {
-			return
-		}
-		if merged.Type == "money_amount" {
-			return
-		}
-		if dedup.IsDuplicate(merged) {
+		if dedup.IsDuplicate(evt) {
 			return
 		}
 
 		// Persist to SQLite
 		if a.db != nil {
-			if _, err := a.db.InsertEvent(merged); err != nil {
-				slog.Error("store event failed", "type", merged.Type, "error", err)
+			if _, err := a.db.InsertEvent(evt); err != nil {
+				slog.Error("store event failed", "type", evt.Type, "error", err)
 			}
 		}
 
 		// Write to JSONL event log
 		if a.eventLog != nil {
 			logEntry := map[string]interface{}{
-				"type":      merged.Type,
-				"source":    merged.Source,
-				"timestamp": merged.Timestamp.Format(time.RFC3339Nano),
-				"data":      merged.Data,
+				"type":      evt.Type,
+				"source":    evt.Source,
+				"timestamp": evt.Timestamp.Format(time.RFC3339Nano),
+				"data":      evt.Data,
 			}
 			if line, err := json.Marshal(logEntry); err == nil {
 				line = append(line, '\n')
@@ -198,10 +193,10 @@ func (a *App) startup(ctx context.Context) {
 
 		// Buffer for event feed
 		entry := EventEntry{
-			Type:      merged.Type,
-			Source:    merged.Source,
-			Timestamp: merged.Timestamp.Format("15:04:05.000"),
-			Data:      merged.Data,
+			Type:      evt.Type,
+			Source:    evt.Source,
+			Timestamp: evt.Timestamp.Format("15:04:05.000"),
+			Data:      evt.Data,
 		}
 		a.eventsMu.Lock()
 		if len(a.recentEvents) >= maxRecentEvents {
@@ -213,7 +208,7 @@ func (a *App) startup(ctx context.Context) {
 		// Always emit to frontend
 		wailsrt.EventsEmit(a.ctx, "event", entry)
 
-		slog.Debug("event", "type", merged.Type, "data", merged.Data)
+		slog.Debug("event", "type", evt.Type, "data", evt.Data)
 	})
 
 	// Start API sync if authenticated
@@ -601,7 +596,7 @@ func (a *App) ConnectToSCBridge() ConnectionStatus {
 		a.syncCancel()
 	}
 	svcCtx, svcCancel := context.WithCancel(context.Background())
-	a.cancel = svcCancel
+	a.syncCancel = svcCancel
 	a.startSync(svcCtx)
 
 	slog.Info("connected to SC Bridge")

@@ -12,31 +12,53 @@ import (
 // Deduplicator suppresses duplicate events within a cooldown window.
 // Game.log often emits the same notification multiple times (Added, Next, StartFade, Remove).
 type Deduplicator struct {
-	mu       sync.Mutex
-	seen     map[string]time.Time
-	cooldown time.Duration
+	mu            sync.Mutex
+	seen          map[string]time.Time
+	cooldown      time.Duration
+	maxCooldown   time.Duration
+	typeCooldowns map[string]time.Duration
 }
 
-// NewDeduplicator creates a deduplicator with the given cooldown window.
+// NewDeduplicator creates a deduplicator with the given default cooldown window.
 func NewDeduplicator(cooldown time.Duration) *Deduplicator {
 	d := &Deduplicator{
-		seen:     make(map[string]time.Time),
-		cooldown: cooldown,
+		seen:          make(map[string]time.Time),
+		cooldown:      cooldown,
+		maxCooldown:   cooldown,
+		typeCooldowns: make(map[string]time.Duration),
 	}
 	// Periodic cleanup of stale entries
 	go d.cleanup()
 	return d
 }
 
+// SetTypeCooldown overrides the dedup window for a specific event type.
+// Use this for notifications that repeat faster than the default cooldown
+// while a condition persists (e.g. "low_fuel" re-fires every ~2 minutes in
+// Game.log while fuel stays low — confirmed in sc_log_reader's research).
+func (d *Deduplicator) SetTypeCooldown(eventType string, cooldown time.Duration) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.typeCooldowns[eventType] = cooldown
+	if cooldown > d.maxCooldown {
+		d.maxCooldown = cooldown
+	}
+}
+
 // IsDuplicate returns true if this event was seen recently.
 func (d *Deduplicator) IsDuplicate(evt Event) bool {
 	key := eventKey(evt)
+	cooldown := d.cooldown
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	if override, ok := d.typeCooldowns[evt.Type]; ok {
+		cooldown = override
+	}
+
 	if lastSeen, ok := d.seen[key]; ok {
-		if time.Since(lastSeen) < d.cooldown {
+		if time.Since(lastSeen) < cooldown {
 			return true
 		}
 	}
@@ -68,66 +90,13 @@ func (d *Deduplicator) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	for range ticker.C {
 		d.mu.Lock()
-		cutoff := time.Now().Add(-d.cooldown * 2)
+		cutoff := time.Now().Add(-d.maxCooldown * 2)
 		for k, v := range d.seen {
 			if v.Before(cutoff) {
 				delete(d.seen, k)
 			}
 		}
 		d.mu.Unlock()
-	}
-}
-
-// CoalesceMultiLine handles multi-line notifications like money transfers.
-// It accumulates "money_sent_pending" events and merges them with the next "money_amount" event.
-type CoalesceMultiLine struct {
-	mu      sync.Mutex
-	pending *Event
-}
-
-// NewCoalesceMultiLine creates a multi-line event coalescer.
-func NewCoalesceMultiLine() *CoalesceMultiLine {
-	return &CoalesceMultiLine{}
-}
-
-// Process takes an event and returns a possibly coalesced event.
-// Returns (event, true) if an event should be emitted, (_, false) if it was absorbed.
-func (c *CoalesceMultiLine) Process(evt Event) (Event, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	switch evt.Type {
-	case "money_sent_pending":
-		// Start accumulating — don't emit yet
-		c.pending = &evt
-		return Event{}, false
-
-	case "money_amount":
-		if c.pending != nil && c.pending.Type == "money_sent_pending" {
-			// Merge: combine recipient from pending with amount from this event
-			merged := Event{
-				Type:      "money_sent",
-				Source:    "log",
-				Timestamp: c.pending.Timestamp,
-				Data: map[string]string{
-					"recipient": c.pending.Data["recipient"],
-					"amount":    evt.Data["amount"],
-					"currency":  "aUEC",
-				},
-			}
-			c.pending = nil
-			return merged, true
-		}
-		// No pending — emit as-is (orphaned amount line)
-		return evt, true
-
-	default:
-		// Any non-money event clears pending state (timeout)
-		if c.pending != nil {
-			// The pending money_sent never got an amount — drop it
-			c.pending = nil
-		}
-		return evt, true
 	}
 }
 

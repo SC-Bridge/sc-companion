@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+
+  <Bundle
+    Name="SC Bridge Suite"
+    Manufacturer="SC-Bridge"
+    Version="$(var.BundleVersion)"
+    UpgradeCode="97E0616F-D4BF-4FD3-A407-FE774F1F64D5"
+    IconSourceFile="bundle-icon.ico"
+    AboutUrl="https://scbridge.app"
+    HelpUrl="https://scbridge.app">
+
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication
+        LicenseFile="license.rtf"
+        ThemeFile="bundle-theme.xml"
+        LocalizationFile="bundle-theme.wxl"
+        LogoFile="bundle-logo.png"
+        SuppressOptionsUI="yes" />
+    </BootstrapperApplication>
+
+    <!-- Per-package selection. bal:Overridable allows command-line override:
+         msiexec /i SCBridgeSuite-setup.exe InstallCompanion=0 InstallHud=1 -->
+    <Variable Name="InstallCompanion" Type="numeric" Value="1" bal:Overridable="yes" />
+    <Variable Name="InstallHud"       Type="numeric" Value="1" bal:Overridable="yes" />
+
+    <Chain>
+      <MsiPackage
+        Id="SCBridgeCompanion"
+        SourceFile="staging\SCBridgeCompanion-setup.msi"
+        DownloadUrl="https://github.com/SC-Bridge/sc-companion/releases/download/v$(var.CompanionVersion)/SCBridgeCompanion-setup.msi"
+        Compressed="no"
+        Vital="yes"
+        Visible="yes"
+        InstallCondition="InstallCompanion = 1" />
+
+      <MsiPackage
+        Id="SCBridgeHud"
+        SourceFile="staging\SCBridgeHUD-setup.msi"
+        DownloadUrl="https://github.com/SC-Bridge/SC-HUD/releases/download/v$(var.HudVersion)/SCBridgeHUD-setup.msi"
+        Compressed="no"
+        Vital="yes"
+        Visible="yes"
+        InstallCondition="InstallHud = 1" />
+    </Chain>
+
+  </Bundle>
+</Wix>

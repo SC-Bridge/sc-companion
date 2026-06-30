@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - "v*"
+  repository_dispatch:
+    # Fired by sibling repos (e.g. SC-HUD) when they publish a new release,
+    # so the SC Bridge Suite bundle is rebuilt to reference the latest child MSIs.
+    types: [hud-released]
 
 permissions:
   contents: write
@@ -12,6 +16,8 @@ permissions:
 
 jobs:
   build-windows:
+    # Skip the sc-companion build entirely on dispatch — only the bundle job runs.
+    if: github.event_name == 'push'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -111,3 +117,113 @@ jobs:
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-bundle:
+    # Builds the SC Bridge Suite bootstrapper that lets users pick which child apps to install.
+    # Runs after build-windows on a tag push (so the new sc-companion MSI is on the release),
+    # OR standalone on repository_dispatch (when SC-HUD publishes a new MSI).
+    runs-on: windows-latest
+    needs: [build-windows]
+    if: |
+      always() &&
+      (needs.build-windows.result == 'success' || github.event_name == 'repository_dispatch')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine versions
+        id: versions
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            COMPANION_VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            COMPANION_VERSION=$(gh release view --repo SC-Bridge/sc-companion --json tagName -q .tagName | sed 's/^v//')
+          fi
+          HUD_VERSION=$(gh release view --repo SC-Bridge/SC-HUD --json tagName -q .tagName | sed 's/^v//')
+          echo "COMPANION_VERSION=$COMPANION_VERSION" >> $GITHUB_OUTPUT
+          echo "HUD_VERSION=$HUD_VERSION" >> $GITHUB_OUTPUT
+          echo "BUNDLE_VERSION=$COMPANION_VERSION" >> $GITHUB_OUTPUT
+          echo "Bundle will reference sc-companion v$COMPANION_VERSION + SC-HUD v$HUD_VERSION"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download child MSIs from GitHub releases
+        shell: bash
+        run: |
+          mkdir -p installer/staging
+          gh release download "v${{ steps.versions.outputs.COMPANION_VERSION }}" \
+            --repo SC-Bridge/sc-companion \
+            --pattern SCBridgeCompanion-setup.msi \
+            --dir installer/staging
+          gh release download "v${{ steps.versions.outputs.HUD_VERSION }}" \
+            --repo SC-Bridge/SC-HUD \
+            --pattern SCBridgeHUD-setup.msi \
+            --dir installer/staging
+          ls -la installer/staging
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Stage bundle UI assets
+        shell: pwsh
+        run: |
+          Copy-Item "build/windows/icon.ico" "installer/bundle-icon.ico"
+          Copy-Item "build/appicon.png" "installer/bundle-logo.png"
+
+      - name: Install WiX Toolset
+        run: dotnet tool install --global wix --version "4.*"
+
+      - name: Build bundle
+        shell: pwsh
+        run: |
+          cd installer
+          wix extension add WixToolset.Bal.wixext/4.0.5
+          wix build bundle.wxs `
+            -ext WixToolset.Bal.wixext `
+            -define BundleVersion=${{ steps.versions.outputs.BUNDLE_VERSION }} `
+            -define CompanionVersion=${{ steps.versions.outputs.COMPANION_VERSION }} `
+            -define HudVersion=${{ steps.versions.outputs.HUD_VERSION }} `
+            -o "..\SCBridgeSuite-setup.exe" `
+            -arch x64
+
+      - name: Upload unsigned bundle
+        id: upload-unsigned-bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-bundle
+          path: SCBridgeSuite-setup.exe
+
+      # SignPath bundle policy must be configured to handle Burn engine extraction/reattach.
+      - name: Sign bundle with SignPath
+        id: sign-bundle
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
+          project-slug: 'sc-companion'
+          signing-policy-slug: 'release-signing-bundle'
+          github-artifact-id: '${{ steps.upload-unsigned-bundle.outputs.artifact-id }}'
+          wait-for-completion: true
+          output-artifact-directory: 'signed-bundle'
+
+      - name: Choose bundle artifact (signed if available)
+        id: bundle-artifact
+        shell: bash
+        run: |
+          if [ -f "signed-bundle/SCBridgeSuite-setup.exe" ]; then
+            echo "Using signed bundle"
+            echo "PATH=signed-bundle/SCBridgeSuite-setup.exe" >> $GITHUB_OUTPUT
+          else
+            echo "Using unsigned bundle (signing not configured)"
+            echo "PATH=SCBridgeSuite-setup.exe" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload bundle to sc-companion release
+        shell: bash
+        run: |
+          gh release upload "v${{ steps.versions.outputs.COMPANION_VERSION }}" \
+            "${{ steps.bundle-artifact.outputs.PATH }}" \
+            --clobber \
+            --repo SC-Bridge/sc-companion
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

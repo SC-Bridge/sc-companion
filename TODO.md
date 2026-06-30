@@ -4,7 +4,6 @@
 
 ## In Progress / Next
 
-- [ ] Review `SyncWorthyTypes` in `bus.go` — new events from today's parser work may be worth syncing (e.g. `crime_committed`, `actor_death`, `objective_complete`)
 - [ ] Frontend: surface new event types in the dashboard (19 new types added, UI categories already updated in `EventCategories()`)
 
 ---
@@ -61,7 +60,21 @@ Three events require 2-line parsing (pendingType/pendingData):
 
 ## Infrastructure / App
 
-- [ ] **Bug:** `ConnectToSCBridge` (app.go:604) — `a.cancel = svcCancel` should be `a.syncCancel = svcCancel`. Overwrites the app-level service context cancel set in startup. Sync works (startSync fixes syncCancel itself) but app shutdown doesn't cancel the original service context (tray, etc.).
+- [ ] **SC Bridge Suite bundle** — first end-to-end test pending. Needs:
+  - Cut a sc-companion tag (any patch version) and verify `SCBridgeSuite-setup.exe` appears on the release
+  - Run the bundle in a clean Windows VM and verify both checkboxes work, both MSIs download from GitHub, both apps install
+  - Visual review of `bundle-theme.xml` layout — likely needs pixel tweaks (margins, button positions) after first build
+  - Configure `SUITE_DISPATCH_TOKEN` secret in SC-HUD repo so its releases auto-trigger bundle rebuilds (otherwise: manually re-tag sc-companion to refresh the bundle when SC-HUD ships)
+  - Configure SignPath `release-signing-bundle` policy for Burn engine signing (insignia dance) — without it the bundle ships unsigned even if child MSIs are signed
+- [ ] **Code signing** — Certum Open Source Developer Code Signing cert is in `cert/` (valid 2026-04-15 → 2027-04-15, issued to Gavin McFall). Private key lives with Certum (SimplySign / cloud HSM). Wire up signing:
+  - Decide signing path: SignPath (CLAUDE.md mentions it's configured but inactive) vs. direct Certum SimplySign via `signtool.exe` in the CI workflow
+  - Sign `SCBridgeCompanion.exe` after `wails build` and before MSI packaging
+  - Sign `SCBridgeCompanion-setup.msi` after WiX build
+  - Sign `SCBridgeCompanion-portable.exe` release artifact
+  - Once the bundle installer lands, sign the bundle `.exe` too (Burn bundles need the engine signed via `insignia` + the bundle itself)
+  - Add SignPath/Certum credentials as GitHub Actions secrets
+  - Verify signatures in CI: `signtool verify /pa /v <file>` should pass with no warnings
+  - Once signed builds ship, the SmartScreen unblock workaround in CLAUDE.md can be removed
 - [ ] **Website issue (scbridge.app):** `/companion/connect` Connect button changed from HTML form submit to JavaScript fetch — browser no longer follows the 302 redirect to `localhost:PORT/callback`, so the OAuth token never arrives. Fix on the website side: revert to a plain `<form method="POST">` with no JS interception.
 - [ ] Investigate whether `DetectedLogPath()` == `DetectGameLog()` — they're identical functions; one may be redundant
 - [ ] `config.go` strategy comment says "Strategy 1" twice (running process and registry) — minor documentation inconsistency
@@ -85,3 +98,6 @@ Three events require 2-line parsing (pendingType/pendingData):
 - [x] Add `cmd/logtest` — corpus analysis tool
 - [x] Add `docs/parser-patterns.csv` — input/output reference for all patterns
 - [x] Update `EventCategories()` in `bus.go` to reflect all current event types
+- [x] Broaden `refinery_complete` pattern to match "Refinery Work Order" regardless of exact surrounding phrasing
+- [x] Give `low_fuel` its own dedup cooldown (was spamming every ~2 min under the global 10s window)
+- [x] Fix `ConnectToSCBridge` clobbering `a.cancel` instead of `a.syncCancel`

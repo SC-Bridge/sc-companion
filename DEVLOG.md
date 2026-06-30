@@ -35,6 +35,117 @@ Game.log
 
 ## Changelog
 
+### 2026-05-08 — Pipeline audit, dead-code cleanup, endpoint probe
+
+#### Pipeline audit — upload coverage
+
+Cross-referenced every parser-emitted event type against `EventCategories()` (the
+Settings UI surface) and confirmed all **57** user-facing types are exposed and
+wired through to the sync client. The 6 internal scaffolding types
+(`money_sent_pending`, `money_amount`, `party_member_joined_pending`,
+`party_join_continuation`, `party_member_left_pending`, `party_left_continuation`)
+correctly never reach the bus — `Parser.Parse` returns `(_, false)` for them and
+emits the merged form on the continuation line.
+
+Default-on coverage: only **18 of 57** types are enabled in
+`DefaultSyncPreferences`. The other 39 are uploadable but require a manual toggle
+in Settings. `IsEnabled()` returns `false` for any key not in the map
+(`preferences.go:79`), so unknown types never sync; toggling writes the key and
+makes them upload from that point forward (no retroactive sync — filtered events
+are still marked `synced=1` in `client.go:131-138`).
+
+Conclusion: pipeline is intact, ability to upload is complete for every parsed
+type, but defaults are conservative.
+
+#### Cleanup performed
+
+- **Deleted dead code** — `SyncWorthyTypes` map and `Event.IsSyncWorthy()` in
+  `internal/events/bus.go` had no callers. Removed.
+- **Deleted redundant coalescer** — `CoalesceMultiLine` in
+  `internal/events/dedup.go` re-implemented multi-line money merging that
+  `Parser.Parse` already handles. Removed the struct + the
+  `coalesce.NewCoalesceMultiLine()` / `coalesce.Process(evt)` plumbing in
+  `app.go`, including the defensive `if merged.Type == "money_amount" { return }`
+  guard that only existed to compensate for the redundant path.
+- **Doc fix** — `endpoints.md` "Event types synced by default" table:
+  added `insurance_claim_complete` (was missing); removed `blueprint_received`
+  (claimed to be default but wasn't); added `Combat: fatal_collision` row.
+- **TODO** — removed obsolete "Review `SyncWorthyTypes`" item.
+
+Verified with `go build ./...` and `go vet ./...` — both clean.
+
+#### Endpoint probe (read-only)
+
+Probed `https://scbridge.app` and `https://staging.scbridge.app` against the
+endpoints documented in `endpoints.md`. Used the local
+`%APPDATA%\SCBridge\auth.json` session token (created 2026-03-27).
+
+| Endpoint | Result |
+|---|---|
+| `GET /` (prod & staging hosts) | 200 — alive |
+| `GET /api/health` | 200 `{"status":"ok"}` |
+| `GET /api/status` | 200 — public, returns sync job history (see below) |
+| `GET /api` | 404 — no root handler |
+| `GET /api/companion/friends` (Bearer) | **401** — token rejected |
+| `GET /api/companion/friends` (X-API-Key) | 401 — legacy auth also rejected |
+| `POST /api/companion/events` (Bearer, `{"events":[]}`) | 401 — token rejected |
+| `POST /api/companion/heartbeat` (Bearer, `{}`) | 401 — token rejected |
+| `GET /api/companion/connect?port=…&state=…` | 200 — public OAuth initiator |
+| `GET https://api.github.com/repos/SC-Bridge/sc-companion/releases/latest` | 200 — latest is `v0.3.14` (2026-03-29) |
+
+Findings:
+
+1. **Local session token is dead** — verbose curl confirmed the
+   `Authorization: Bearer …` header was sent verbatim; server returned
+   `{"error":"Authentication required"}`. Token has expired (or was revoked) since
+   2026-03-27. Reconnecting via Settings → "Connect to SC Bridge" gets a fresh
+   one. The `SetOnAuthExpired` callback (`app.go:258`) is wired to detect this
+   and emit `auth_expired` to the frontend.
+
+2. **`/companion/friends` IS deployed** — `endpoints.md:94, 104` claims it
+   "returns 404 — endpoint not yet deployed", but the live server returns 401
+   (auth gate active), confirming the route exists. Doc is stale — update when
+   convenient.
+
+3. **Server-side D1 errors visible in `/api/status`** — `production_status`
+   sync job has been failing daily from 2026-05-04 → 2026-05-08 with
+   `D1_ERROR: too many SQL variables at offset 251: SQLITE_ERROR`. The
+   companion `ships` sync (49 records) runs successfully alongside it. This is
+   a backend bug on `scbridge.app` (Cloudflare D1), not a companion issue —
+   batched insert/update needs chunking. Worth flagging to the server team.
+
+---
+
+### Unreleased — SC Bridge Suite bundle (2026-04-19)
+
+Added a WiX Burn bootstrapper (`installer/bundle.wxs`) that lets users pick which
+SC Bridge tools to install (SC-Companion + SC-HUD, both checked by default). The bundle
+ships as `SCBridgeSuite-setup.exe` alongside the existing `SCBridgeCompanion-setup.msi` on
+sc-companion releases.
+
+**Architecture:**
+- Each child app keeps its own independent MSI, repo, and release pipeline. The bundle
+  just chains them — no code is shared, no upgrade entanglement.
+- `MsiPackage` entries use `Compressed="no"` + `DownloadUrl` pointing at version-pinned
+  GitHub release URLs. The bundle .exe is a small stub (~5 MB); MSIs download at install time.
+- Two bundle Variables (`InstallCompanion`, `InstallHud`) bound to checkboxes in a custom
+  WixStandardBootstrapperApplication theme (`bundle-theme.xml` + `bundle-theme.wxl`).
+  Also overridable from the command line for silent/scripted installs.
+- Burn hash-pins each MSI at bundle-build time, so the bundle is always re-cut whenever
+  EITHER child repo publishes a new release. SC-HUD's CI fires a `repository_dispatch`
+  event (`hud-released`) at sc-companion to trigger a bundle-only rebuild.
+- New `build-bundle` job in the CI: skipped on dispatch path's MSI build, downloads both
+  child MSIs from their GitHub releases, builds + signs the bundle, uploads it as
+  `SCBridgeSuite-setup.exe` to sc-companion's latest release (`--clobber`).
+
+**Setup still needed before this works end-to-end:**
+- Add repo secret `SUITE_DISPATCH_TOKEN` in `SC-Bridge/SC-HUD` — PAT (or GitHub App token)
+  with `repo` scope on `SC-Bridge/sc-companion`. Without it, SC-HUD releases won't trigger
+  bundle rebuilds (manual workflow_dispatch still works as a fallback).
+- Configure SignPath project policy `release-signing-bundle` for Burn bundle signing
+  (handles engine extract / sign / reattach automatically). Without it, the bundle ships
+  unsigned and triggers SmartScreen.
+
 ### v0.3.9 (2026-03-27)
 - Fixed self-update silently failing for MSI installs in `C:\Program Files` — PowerShell ran without elevation so `Copy-Item` was denied. Now uses `msiexec /passive -Verb RunAs` which triggers a UAC prompt and installs correctly.
 - Fixed portable exe update timing race — replaced `Start-Sleep -Seconds 2` with `$p.WaitForExit(30000)` on the actual process PID so the file lock is guaranteed released before copy.

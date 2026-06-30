@@ -264,10 +264,14 @@ func NewParser() *Parser {
 				}
 			},
 		},
-		// Refinery complete
+		// Refinery complete — match "Refinery Work Order" anywhere in the
+		// notification text rather than anchoring to the exact phrasing.
+		// Live 4.8.2 logs say "A Refinery Work Order has been Completed at
+		// X"; sc_log_reader's corpus also has "Refinery Work Order(s)
+		// Completed at X" without "has been" — stay robust to either.
 		{
 			name: "refinery_complete",
-			re:   regexp.MustCompile(`Added notification "A Refinery Work Order has been Completed at (.+?):`),
+			re:   regexp.MustCompile(`Added notification ".*?Refinery Work Order.*?at\s+([^:"]+)`),
 			extract: func(m []string) events.Event {
 				return events.Event{
 					Type: "refinery_complete", Source: "log",
