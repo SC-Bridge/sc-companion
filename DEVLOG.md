@@ -35,6 +35,39 @@ Game.log
 
 ## Changelog
 
+### 2026-07-03 — Accountant data-loss fixes: event_id stamping + skip-not-synced
+
+Two verified data-loss issues in the event → SC Bridge accountant path.
+
+**1. Stable `event_id` on every event.** The server-side accountant bridge
+(`companion-bridge.ts`) dedupes ledger entries on `data.event_id`, falling back
+to `companion:<type>:<timestamp>` when absent. Two same-type economy events in
+the same log-timestamp second (e.g. two fines) shared a fallback key, so the
+second was silently dropped from the ledger. Now `events.StampID` assigns a
+UUIDv4 to `Data["event_id"]` once, in the bus subscriber (`app.go`) — after
+dedup (so the always-unique id can't defeat it) and before both the SQLite
+insert and the JSONL write, so both and every resend carry the byte-identical
+id. Stamping at the subscriber (not the parser) means multi-line events are
+already coalesced into one Event, so the merged event gets exactly one id.
+`StampID` is idempotent (won't regenerate an existing id), so store resends stay
+stable.
+
+**2. Disabled sync-preference types no longer permanently lost.** Previously the
+sync client marked *all* fetched events `synced=1`, including preference-filtered
+ones — so disabling a type (or having it default-off) permanently withheld those
+events from the accountant, even after re-enabling. The `synced` column is now
+tri-state (`0` pending, `1` done, `2` skipped; no migration — column was already
+INTEGER). `syncBatch` marks disabled-type events `2` and only delivered events
+`1`. Re-enabling a type (`SetSyncPreference`) calls `RequeueSkipped` (`2→0`);
+`ResetSyncPreferences` calls `RequeueAllSkipped`. The five accountant-critical
+economy types were already default-on; a comment now guards them.
+
+Files: `internal/events/id.go` (new), `internal/store/store.go`,
+`internal/sync/client.go`, `app.go`, `internal/config/preferences.go`,
+`frontend/src/components/Settings.jsx` (Economy toggle consequence copy),
+`endpoints.md`. Tests added (first `*_test.go` in the repo): `events/id_test.go`,
+`store/store_test.go`, `sync/client_test.go`, `logtailer/parser_test.go`.
+
 ### 2026-05-08 — Pipeline audit, dead-code cleanup, endpoint probe
 
 #### Pipeline audit — upload coverage

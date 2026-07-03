@@ -31,7 +31,10 @@ func DefaultSyncPreferences() *SyncPreferences {
 			// Location
 			"location_change":      true,
 			"jurisdiction_entered": true,
-			// Economy
+			// Economy — these five are the accountant-critical types the SC
+			// Bridge accountant bridge derives ledger entries from
+			// (companion-bridge.ts FINANCIAL_TYPES). They MUST default to true:
+			// disabling one skips those money movements from the ledger.
 			"money_sent":           true,
 			"fined":                true,
 			"transaction_complete": true,

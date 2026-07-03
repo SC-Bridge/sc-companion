@@ -6,6 +6,10 @@
 
 - [ ] Frontend: surface new event types in the dashboard (19 new types added, UI categories already updated in `EventCategories()`)
 
+## Done
+
+- [x] Accountant data loss: stamp stable `event_id` (UUIDv4) on every event; make sync-preference exclusions `skipped` (re-enable requeues) instead of permanently `synced` (2026-07-03)
+
 ---
 
 ## Parser

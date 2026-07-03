@@ -111,38 +111,36 @@ func (c *Client) syncBatch(ctx context.Context) error {
 		return nil
 	}
 
-	// Filter events by sync preferences
-	var filtered []store.StoredEvent
+	// Partition by sync preference. Disabled types are marked SyncSkipped
+	// (not SyncDone) so re-enabling the type later requeues them — the server
+	// dedupes idempotently on data.event_id and orders by the log timestamp,
+	// so late delivery of accountant-relevant events is safe.
+	var toSend []store.StoredEvent
+	var skipIDs []int64
 	for _, e := range events {
 		if c.syncCheck != nil && !c.syncCheck(e.Type) {
+			skipIDs = append(skipIDs, e.ID)
 			continue
 		}
-		filtered = append(filtered, e)
+		toSend = append(toSend, e)
 	}
 
-	// Mark all as synced (even filtered-out ones — they shouldn't be retried)
-	var maxID int64
-	for _, e := range events {
-		if e.ID > maxID {
-			maxID = e.ID
-		}
+	// Advance skipped events out of the pending set. Safe before the POST:
+	// they are not being sent, and a later re-enable requeues them.
+	if err := c.store.MarkSkippedIDs(skipIDs); err != nil {
+		return fmt.Errorf("mark skipped: %w", err)
 	}
 
-	if len(filtered) == 0 {
-		// Nothing to send, but still mark as synced
-		if maxID > 0 {
-			if err := c.store.MarkSynced(maxID); err != nil {
-				return fmt.Errorf("mark synced: %w", err)
-			}
-		}
+	if len(toSend) == 0 {
 		return nil
 	}
 
 	payload := SyncPayload{
-		Events: make([]SyncEvent, len(filtered)),
+		Events: make([]SyncEvent, len(toSend)),
 	}
+	sentIDs := make([]int64, len(toSend))
 
-	for i, e := range filtered {
+	for i, e := range toSend {
 		var data map[string]string
 		if err := json.Unmarshal([]byte(e.DataJSON), &data); err != nil {
 			data = map[string]string{"raw": e.DataJSON}
@@ -154,6 +152,7 @@ func (c *Client) syncBatch(ctx context.Context) error {
 			Timestamp: e.Timestamp,
 			Data:      data,
 		}
+		sentIDs[i] = e.ID
 	}
 
 	body, err := json.Marshal(payload)
@@ -187,12 +186,13 @@ func (c *Client) syncBatch(ctx context.Context) error {
 		return fmt.Errorf("api returned %d", resp.StatusCode)
 	}
 
-	// Mark as synced
-	if err := c.store.MarkSynced(maxID); err != nil {
+	// Mark the delivered events as synced. On a POST failure above we return
+	// early, leaving them SyncPending for the next tick to retry.
+	if err := c.store.MarkSyncedIDs(sentIDs); err != nil {
 		return fmt.Errorf("mark synced: %w", err)
 	}
 
-	slog.Info("synced events", "count", len(filtered), "max_id", maxID)
+	slog.Info("synced events", "count", len(toSend), "skipped", len(skipIDs))
 	return nil
 }
 

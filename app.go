@@ -170,6 +170,12 @@ func (a *App) startup(ctx context.Context) {
 			return
 		}
 
+		// Stamp a stable, unique id once, before persistence and the JSONL
+		// write, so both — and every later resend from the store — carry the
+		// byte-identical event_id the SC Bridge accountant bridge dedupes on.
+		// Stamped after dedup so the id (always unique) can't defeat it.
+		events.StampID(&evt)
+
 		// Persist to SQLite
 		if a.db != nil {
 			if _, err := a.db.InsertEvent(evt); err != nil {
@@ -479,6 +485,16 @@ func (a *App) SetSyncPreference(eventType string, enabled bool) {
 	if err := a.syncPrefs.Save(); err != nil {
 		slog.Error("failed to save sync preferences", "error", err)
 	}
+	// Re-enabling a type makes events previously withheld while it was disabled
+	// eligible again, so the accountant ledger can still receive them (the
+	// server dedupes idempotently on event_id).
+	if enabled && a.db != nil {
+		if n, err := a.db.RequeueSkipped(eventType); err != nil {
+			slog.Error("failed to requeue skipped events", "type", eventType, "error", err)
+		} else if n > 0 {
+			slog.Info("requeued skipped events for re-enabled type", "type", eventType, "count", n)
+		}
+	}
 }
 
 // ResetSyncPreferences resets all sync preferences to defaults.
@@ -486,6 +502,16 @@ func (a *App) ResetSyncPreferences() map[string]bool {
 	a.syncPrefs = config.DefaultSyncPreferences()
 	if err := a.syncPrefs.Save(); err != nil {
 		slog.Error("failed to save sync preferences", "error", err)
+	}
+	// Defaults re-enable the accountant-critical economy types; requeue every
+	// skipped event so those become deliverable. The next sync pass re-skips
+	// any type still disabled.
+	if a.db != nil {
+		if n, err := a.db.RequeueAllSkipped(); err != nil {
+			slog.Error("failed to requeue skipped events", "error", err)
+		} else if n > 0 {
+			slog.Info("requeued all skipped events after preferences reset", "count", n)
+		}
 	}
 	return a.syncPrefs.SyncEnabled
 }

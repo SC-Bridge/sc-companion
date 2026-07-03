@@ -202,6 +202,12 @@ function Settings({ config, onConfigChange, onUpdateFound }) {
               </button>
               {expanded && (
                 <div style={{ paddingLeft: 40, paddingRight: 16, paddingBottom: 8 }}>
+                  {cat.name === 'Economy' && (
+                    <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.5, paddingBottom: 6 }}>
+                      Feeds your SC Bridge Accountant ledger. Disabling one skips those
+                      money movements until you re-enable it.
+                    </div>
+                  )}
                   {cat.events.map(evt => (
                     <label
                       key={evt.type}

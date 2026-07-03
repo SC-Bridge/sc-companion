@@ -4,10 +4,26 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/SC-Bridge/sc-companion/internal/events"
 	_ "modernc.org/sqlite"
+)
+
+// Sync state values stored in the events.synced column. The column has always
+// been an INTEGER, so introducing SyncSkipped adds a value rather than a schema
+// change — no migration required.
+const (
+	// SyncPending: not yet processed by the sync client.
+	SyncPending = 0
+	// SyncDone: successfully delivered to SC Bridge.
+	SyncDone = 1
+	// SyncSkipped: withheld because the event type is disabled in sync
+	// preferences. Distinct from SyncDone so re-enabling the type can requeue
+	// these for delivery — the server dedupes idempotently, so late delivery
+	// of accountant-relevant events is safe.
+	SyncSkipped = 2
 )
 
 // Store persists events to a local SQLite database.
@@ -129,10 +145,64 @@ func (s *Store) UnsyncedEvents(limit int) ([]StoredEvent, error) {
 	return out, rows.Err()
 }
 
-// MarkSynced marks events as synced up to the given ID.
-func (s *Store) MarkSynced(upToID int64) error {
-	_, err := s.db.Exec("UPDATE events SET synced = 1 WHERE id <= ? AND synced = 0", upToID)
+// MarkSyncedIDs marks the given events as successfully delivered (SyncDone).
+func (s *Store) MarkSyncedIDs(ids []int64) error {
+	return s.setSyncState(ids, SyncDone)
+}
+
+// MarkSkippedIDs marks the given events as withheld by sync preferences
+// (SyncSkipped). Unlike SyncDone, these remain requeueable via RequeueSkipped
+// if the user later re-enables the type.
+func (s *Store) MarkSkippedIDs(ids []int64) error {
+	return s.setSyncState(ids, SyncSkipped)
+}
+
+// setSyncState updates the synced column for a set of event IDs in one
+// statement. No-op for an empty slice.
+func (s *Store) setSyncState(ids []int64, state int) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	placeholders := make([]string, len(ids))
+	args := make([]any, 0, len(ids)+1)
+	args = append(args, state)
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+	query := fmt.Sprintf("UPDATE events SET synced = ? WHERE id IN (%s)", strings.Join(placeholders, ","))
+	_, err := s.db.Exec(query, args...)
 	return err
+}
+
+// RequeueSkipped returns previously skipped events of a given type to the
+// pending state so they become eligible for sync again. Called when the user
+// re-enables a type whose events were withheld while it was disabled. Returns
+// the number of events requeued.
+func (s *Store) RequeueSkipped(eventType string) (int64, error) {
+	res, err := s.db.Exec(
+		"UPDATE events SET synced = ? WHERE type = ? AND synced = ?",
+		SyncPending, eventType, SyncSkipped,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// RequeueAllSkipped returns every skipped event to the pending state. Used when
+// preferences are reset to defaults (which re-enable the accountant-critical
+// economy types); the next sync pass re-skips any type still disabled. Returns
+// the number of events requeued.
+func (s *Store) RequeueAllSkipped() (int64, error) {
+	res, err := s.db.Exec(
+		"UPDATE events SET synced = ? WHERE synced = ?",
+		SyncPending, SyncSkipped,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // EventCounts returns the count of each event type.

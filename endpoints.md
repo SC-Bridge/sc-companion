@@ -21,7 +21,7 @@ Auth header is `Authorization: Bearer {session_token}`. Legacy API key connectio
 
 ## POST /companion/events
 
-Batches up to 100 unsynced events and posts them every 10 seconds. Only event types enabled in sync preferences are included; excluded types are still marked synced and not retried.
+Batches up to 100 unsynced events and posts them every 10 seconds. Only event types enabled in sync preferences are included; excluded types are marked **skipped** (not synced) so re-enabling the type requeues them for delivery. Every event carries a stable `data.event_id` (UUIDv4, stamped once at first persistence) that the server uses for idempotent dedup.
 
 **Request**
 ```json
@@ -122,10 +122,11 @@ Same response shape as full friends list.
 Game.log
   → LogTailer (file reader + regex parser)
   → Event { type, source, timestamp, data map[string]string }
-  → SQLite (synced = 0)
+  → StampID — data.event_id = UUIDv4 (once, before persistence)
+  → SQLite (synced = 0 / pending)
   → SyncClient ticker (10s)
   → POST /companion/events (batch ≤ 100)
-  → SQLite (synced = 1 on 200 OK)
+  → SQLite (synced = 1 / done, on 200 OK)
 ```
 
-Events not matching enabled sync preferences are skipped but still marked synced.
+The `synced` column is tri-state: `0` pending, `1` done, `2` skipped. Events whose type is disabled in sync preferences are marked `2` (skipped) rather than `1`, so re-enabling the type (`RequeueSkipped`) returns them to pending and they sync on the next tick. The server dedupes idempotently on `data.event_id` and orders by the log timestamp, so late delivery is safe.
